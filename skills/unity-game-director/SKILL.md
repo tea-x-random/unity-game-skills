@@ -141,7 +141,7 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 # -> TRIPO_API_KEY=SET|MISSING / GEMINI_API_KEY=SET|MISSING / ELEVENLABS_API_KEY=SET|MISSING
 ```
 
-"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. The probe checks **both** `GEMINI_API_KEY` and `TRIPO_API_KEY` — for premium character/prop/animated assets, consider Tripo (including **pre-rendering Tripo models to sprites for 2D games**, see `unity-3d-generator` "Use Tripo for 2D games too"), don't default to Gemini-only 2D generation.
+"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. The probe checks **both** `GEMINI_API_KEY` and `TRIPO_API_KEY` — for premium character/prop/animated assets, consider Tripo (including **pre-rendering Tripo models to sprites for 2D games**, see `unity-3d-generator` "Use Tripo for 2D games too"), don't default to Gemini-only 2D generation. **Motion → Tripo, static → Gemini:** produce any animated/moving asset with Tripo (rig + render-to-sprite for 2D); Gemini frame-by-frame drifts and is a fallback only when `TRIPO_API_KEY` is `MISSING`/quota-blocked.
 
 **Real generated art is the DEFAULT for EVERY primary visible surface — not one hero asset.** Each surface the player actually looks at should be a real generated/sourced asset with evidence (a Tripo task ID + imported GLB/FBX path, or a generated sprite/texture path): the background/terrain/ground, the path/track, the player, enemies/obstacles, towers/units, signature props, and the key UI. A single generated hero amid untextured everything-else is NOT a premium scene.
 
@@ -165,7 +165,7 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 - `unity-gameplay-systems`: first playable slice, project/scene setup, C# (cache `GetComponent` in `Awake`; Input System not legacy `Input`; pooling; no allocations in `Update`; `[SerializeField] private`; asmdefs), entity/state systems, camera, controls, scoring, difficulty, game feel. 2D and 3D casual templates.
 - External asset sourcing: credential probe, generator skill loading, source decision, task IDs / output files or blocker evidence. Must complete before graphics is "done" for premium visual claims.
 - `unity-3d-generator`: Tripo text/image→3D, texture, auto-rig, animation, conversion, GLB/FBX → write into `Assets/`, import, configure import settings.
-- `unity-image-generator`: 2D sprites, sprite sheets, UI art, backgrounds, icons, textures, image-to-3D inputs.
+- `unity-image-generator`: STATIC 2D art only — sprites, UI art, backgrounds, icons, textures, concepts, and high-quality reference images that condition Tripo (image-to-3D inputs). Anything ANIMATED / with motion routes to `unity-3d-generator` (Tripo rig + animate, pre-rendered to sprites for 2D) plus `unity-animation`, not frame-by-frame Gemini.
 - `unity-audio-generator`: SFX, loops/music, UI sounds, voice/TTS → import as AudioClips.
 - `unity-graphics`: basic-looking scenes → URP setup, lighting, materials, mobile-safe post, visual quality.
 - `unity-aaa-graphics`: premium/AAA visual upgrades — art-direction critique, mandatory per-surface asset sourcing, AAA prompt library + genre art kits, render polish, and a visual scorecard gate that fails flat/programmer-art scenes. Route here for any "make it look good / premium / looks basic" request.

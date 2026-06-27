@@ -1,15 +1,19 @@
 ---
 name: unity-image-generator
-description: "Generate and edit 2D image assets for Unity casual games using Google's Gemini image API, then import them as sprites/textures/UI. Use for 2D casual games (match-3, puzzle, hyper-casual): sprites, sprite sheets, character/prop art, backgrounds, tile art, UI panels, buttons, icons, logos, title/menu art, particle textures, and material/texture references. Also produces concept and texture references that feed unity-3d-generator (image-to-3D). Covers Unity 2D import: Sprite mode, pixels-per-unit, filtering, sprite atlas, and ASTC for iOS."
+description: "Generate and edit STATIC 2D image assets for Unity casual games using Google's Gemini image API, then import them as sprites/textures/UI. Use for 2D casual games (match-3, puzzle, hyper-casual): static sprites, character/prop art, backgrounds, tile/ground art, tiling textures, UI panels, buttons, icons, logos, title/menu art, particle textures, and material/texture references. For ANIMATED/motion assets (characters, animated actors, multi-angle/turnaround, anything that needs smooth animation) prefer Tripo (unity-3d-generator) to rig + animate, and for 2D pre-render the rig to sprite frames — this skill's role there is producing the high-quality concept/reference images that condition those Tripo models (image-to-3D). Covers Unity 2D import: Sprite mode, pixels-per-unit, filtering, sprite atlas, and ASTC for iOS."
 ---
 
 # Unity Image Generator
 
-Generate 2D art with Gemini, then import it into Unity correctly for sprites, UI, or textures. This is the primary asset skill for **2D casual iOS games**, and the concept/reference source for image-to-3D.
+Generate **static** 2D art with Gemini, then import it into Unity correctly for sprites, UI, or textures. This is the skill for **static 2D art, textures/grounds, backgrounds, UI/icons, and reference/concept images**. Anything that **moves** — characters, animated actors, multi-angle/turnaround assets, anything needing smooth animation — should be produced with **Tripo** (`unity-3d-generator`: rig + animate; for 2D, **pre-render the rig to sprite frames**), with Gemini providing the high-quality reference images that condition those Tripo models.
 
-## Gemini vs Tripo — pick the right tool
+## Gemini vs Tripo — pick the right tool (library-wide rule)
 
-Use Gemini (this skill) for concepts, tiling ground/textures, backgrounds, UI, icons, and 2D art that doesn't need multiple angles. But for **characters, props, and animated actors — even in a 2D game** — prefer generating a 3D model with Tripo and **rendering it to sprites** (`unity-3d-generator` → "Use Tripo for 2D games too" + `../unity-3d-generator/references/prerender-2d.md`). One rendered model gives consistent identity across frames and angles and drift-free animation, whereas independently generating each sprite/frame with an image model drifts. Reach for Tripo pre-render first on anything that needs multiple poses, turnaround consistency, or motion; reach for Gemini on everything else.
+> **Motion → Tripo, static → Gemini.** This is the canonical, library-wide policy.
+
+- **Anything that needs motion, smooth animation, multiple poses, or turnaround consistency → Tripo** (`unity-3d-generator`): rig + animate, and for **2D games render the rig to sprite frames** (see `unity-3d-generator` → "Use Tripo for 2D games too" + `../unity-3d-generator/references/prerender-2d.md`, then `unity-animation`). One rigged, rendered model gives consistent identity across frames and angles and drift-free animation.
+- **Gemini (this skill) → static art:** concepts, tiling ground/textures, backgrounds, UI, icons, logos, and 2D art that doesn't move or need multiple angles — plus the **reference images that condition Tripo** (image-to-3D).
+- **Gemini frame-by-frame animation DRIFTS** (each independently generated frame loses identity) and is a **FALLBACK ONLY** — reach for it only when `TRIPO_API_KEY` is **MISSING**/quota-blocked, or when the motion is trivial.
 
 ## API key & script
 
@@ -55,7 +59,7 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 ## What to generate for casual games
 
 - **Sprites / characters / props:** request transparent background, single centered subject, consistent style, clean edges. For pixel art, ask for crisp pixels and a fixed palette.
-- **Sprite sheets:** request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell). For animated assets, generate per-state frame strips (idle/walk/attack) and `unity-animation` slices them into Animation Clips + an Animator with frame-synced events.
+- **Sprite sheets:** request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell). For **animated assets, produce frames via Tripo rig + pre-render by DEFAULT** (`unity-3d-generator` pre-render → `unity-animation`) — one rigged model gives drift-free, consistent frames across states/angles. Direct Gemini per-state frame strips (idle/walk/attack) sliced by `unity-animation` are the **FALLBACK** only when Tripo is unavailable (`TRIPO_API_KEY` missing/quota-blocked) or the motion is trivial.
 - **Backgrounds / parallax layers:** request seamless or full-bleed layers sized to portrait phone aspect (e.g. 1080×1920 framing).
 - **UI:** buttons, panels, frames, progress bars, currency/HUD icons, settings glyphs — flat, high-contrast, readable at small size, transparent background. Keep a consistent icon family.
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
@@ -120,4 +124,5 @@ Then:
 
 ## Field notes & lessons
 
+- **Policy: Motion → Tripo, static → Gemini.** Anything that moves or needs multiple poses/turnaround consistency goes through Tripo (rig + animate; pre-render to sprites for 2D) with Gemini supplying the reference images that condition it. Gemini is for static art, textures, grounds, backgrounds, UI/icons, and concept/reference images; its frame-by-frame animation drifts and is a fallback only when `TRIPO_API_KEY` is missing/quota-blocked.
 - Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted non-Latin text needs a matching TMP font (default LiberationSans has no glyphs for many scripts) — fall back to a supported script until imported.

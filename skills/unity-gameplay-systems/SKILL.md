@@ -244,6 +244,8 @@ public class Pool : MonoBehaviour
 
 Casual games live on feedback. Keep each effect short and snappy:
 
+Scope: **procedural** game-feel motion (squash/stretch, tweens, screen-shake, hit-stop) lives here; **authored** character/asset animation (walk/attack/idle/death/etc.) is produced via Tripo + `unity-animation` (motion → Tripo, not frame-by-frame Gemini).
+
 - **Tweening:** DOTween (if present) or coroutines for scale/position/color pops.
 - **Squash & stretch** on land/hit; **screen shake** on impact (offset the camera, decay back); **hit-stop** (brief `Time.timeScale` dip on big hits).
 - **Particle pops** and **score popups** (pooled world-space text) on collect/match.

@@ -85,6 +85,7 @@ A short rubric + the reject-loop checklist is in **`references/consistency-qa.md
 
 - **2D:** pass the final prompt + reference image to `unity-image-generator` → it generates, then imports (Sprite mode, PPU, FilterMode, ASTC for iOS) and slices sheets via the Sprite Editor / atlas. Sprite-sheet/atlas consistency (uniform cell size, packed into one atlas to cut draw calls) is its concern — your job was only that the source grid is *visually* uniform.
 - **3D:** pass the turnaround sheet (front/side/back) to `unity-3d-generator` as the image-to-3D input → it runs Tripo, downloads to `Assets/`, and configures the ModelImporter.
+- **Motion → Tripo:** Gemini reference/turnaround sheets are *references and static art only* — any asset that will be ANIMATED should have its sheet feed **Tripo** (`unity-3d-generator`: rig + animate; pre-render the rig to sprite frames for 2D), not frame-by-frame Gemini, which drifts and is a fallback only when `TRIPO_API_KEY` is missing.
 - **UI:** confirm the shared palette matches `unity-ui-designer`'s tokens before icons land in the HUD/menu.
 
 ## When to invoke this skill

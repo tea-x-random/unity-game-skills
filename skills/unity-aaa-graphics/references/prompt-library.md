@@ -4,6 +4,8 @@ One-line prompts produce one-line art. This library gives a reusable **prompt te
 
 > Replace every `[BRACKET]` with your project's own art-direction tokens (from the style guide). Keep the *structure*; vary the *tokens*.
 
+> **Source rule:** motion / animated / multi-angle assets → Tripo (rig + animate; for 2D, pre-render the cycles to sprite frames — see `unity-3d-generator` pre-render + `../../unity-animation/SKILL.md`). Gemini → static art, textures, UI, and the reference images that condition Tripo. Gemini frame-by-frame drifts and is a fallback only when the Tripo key is `MISSING`.
+
 ## The prompt template (anatomy)
 
 A production-quality prompt names all of these, in roughly this order:
@@ -69,7 +71,7 @@ Surfaces: **tiling ground texture**, **textured path/track**, **build-slot tiles
 
 > The classic TD amateur look = flat green fill + flat tan path + translucent square slots + one castle. Replace the **ground, path, and slots with real textures** and add **scatter props** first — that alone removes most of the MS-Paint read.
 
-> Acting assets need animation states. Archer/tower: generate an idle + aim + fire frame strip (2D) or rig + idle/aim/fire cycles (3D); see `../../unity-animation/SKILL.md`. The fire clip must release the projectile on the loose frame via an Animation Event.
+> Acting assets need animation states, and the default is Tripo. Archer/tower: rig + idle/aim/fire cycles (for 2D, pre-render those cycles to sprite frames); a directly-generated 2D idle/aim/fire frame strip is the fallback (Tripo key `MISSING`). See `../../unity-animation/SKILL.md`. The fire clip must release the projectile on the loose frame via an Animation Event.
 
 Exemplar — tower:
 ```
@@ -88,7 +90,7 @@ transparent background, single tile centered, no text. NOT: flat translucent squ
 ```
 
 ### Endless runner / arcade (side or 3/4 view)
-Surfaces: **player character** (+ run/jump frames or rigged 3D), **obstacle set**, **collectibles**, **parallax background layers (3–4)**, **ground/track texture**, **VFX**, **HUD**.
+Surfaces: **player character** (animated → Tripo rig with run/jump cycles, pre-rendered to sprites for 2D by default; directly-generated run/jump frames are the fallback when the Tripo key is `MISSING`), **obstacle set**, **collectibles**, **parallax background layers (3–4)**, **ground/track texture**, **VFX**, **HUD**.
 
 Exemplar — parallax background:
 ```

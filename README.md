@@ -244,6 +244,7 @@ See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results
 
 - **Ask for real generated art on every surface**, not flat placeholders — terrain, paths, units, and props should be sourced art, not solid fills. The `unity-aaa-graphics` skill enforces this with a per-surface asset-sourcing decision and a visual scorecard.
 - **Pin an art-direction north-star early** — palette, style, and finish (flat vs glossy) — so every asset and screen stays on-model instead of drifting.
+- **Motion → Tripo, static → Gemini.** Produce anything that animates (characters, enemies, towers) with Tripo3D (rig + animate; pre-rendered to sprite frames for 2D) — Gemini is for static art, textures, UI, and reference images. Frame-by-frame image generation drifts.
 - **Design for hybrid monetization (ads + IAP).** Only ~1.8% of players ever buy an IAP, so rewarded/interstitial ads carry most casual revenue — plan both, not one.
 - **Instrument retention (D1/D7/D30) and tune via remote config / A/B testing** rather than guessing. The `unity-analytics-liveops` skill covers the funnels, SDKs, and experiments.
 
