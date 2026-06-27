@@ -71,11 +71,11 @@ field into a `Texture2D` (soft anti-aliased alpha edge), created once and reused
 `Image` (`Sprite.Create(..., border)` + `Image.type = Sliced`), gives crisp rounded corners at any
 size. Tint comes from `Image.color`, so highlights still work. Pair with the warm palette above and
 the board/buttons immediately look intentional. Swap in generated art later through the same
-`Image.sprite` slot. (Used as the standing-in skin for a cozy Sudoku slice.)
+`Image.sprite` slot. (Used as a stand-in skin for a prototype slice.)
 
 This scales to a **shippable** "premium casual" look with zero external image assets when art is
 blocked (e.g. image-gen API quota): the same SDF approach yields rounded-rect 9-slice tiles/buttons
-**and recognizable icon tokens** — e.g. a cow face composited from circle/ellipse SDFs with proper
+**and recognizable icon tokens** — e.g. a simple character/mascot face composited from circle/ellipse SDFs with proper
 **alpha-over blending**. **Cache each generated `Sprite` in a static field (generate once)** so you
 pay the rasterization cost a single time, and tint per-use via `Image.color`. This let a colorful,
 cohesive board ship with no external assets. Keep it as the procedural-fallback path and still flag
@@ -97,12 +97,14 @@ only, each strip's **pivot CENTERED on the edge** so it straddles the cell-spaci
 neighbor's strip as one continuous thick line — no global texture alignment needed. Only boundary
 edges get strips, so it stays perf-friendly.
 
-**Japanese-minimalist / zen art direction (when asked for zen, wabi-sabi, or minimal).** Recipe that
-reads as intentional: a warm **sumi-ink** ground + **washi-paper** panels + a MUTED traditional
-**dentō-iro** palette (vermilion / ochre / ai-indigo / moegi / fuji / asagi / sakura / sage) chosen so
-regions stay distinguishable; generous negative space; faint **sumi-e ink-wash** motifs (a distant
-mountain, an enso circle). Reduce gloss and saturation vs candy-casual, but keep regions distinct for
-puzzle readability. Because the whole look flows from the palette, a muted palette swap in **one theme
+**Cohesive themed art direction (when asked for ANY named look).** A theme-neutral recipe that reads as
+intentional, regardless of the aesthetic requested: a single unified **GROUND** treatment + a single
+unified **PANEL** treatment + a deliberately limited, coherent **palette** (chosen so gameplay regions
+stay distinguishable for puzzle readability) + generous **negative space** + one or two **signature
+motifs**, with **gloss and saturation dialed to match the chosen theme** (high gloss/candy for playful,
+low gloss/muted for minimal). The recipe is the same across themes — only the tokens change: e.g.
+zen-minimal, neon-retro, watercolor-storybook, or flat-pastel all plug the same slots (ground, panels,
+palette, motif). Because the whole look flows from the palette, a token swap in **one theme
 ScriptableObject reskins the entire game instantly** — author themes as data, not per-element color.
 
 **Flat-2D depth kit (lifts a flat board to "designed" with zero art).** Three cheap procedural
@@ -147,8 +149,8 @@ Report the pipeline confirmed (URP), lighting approach (baked + probes), materia
 
 ## Field notes & lessons
 
-- Extended procedural-SDF guidance to a shippable no-external-asset look — rounded-rect 9-slice tiles/buttons plus icon tokens (e.g. cow face) composited from circle/ellipse SDFs with alpha-over blending, statically cached (generate once), tinted via `Image.color`.
+- Extended procedural-SDF guidance to a shippable no-external-asset look — rounded-rect 9-slice tiles/buttons plus icon tokens (e.g. a simple character face) composited from circle/ellipse SDFs with alpha-over blending, statically cached (generate once), tinted via `Image.color`.
 - Added region/grid borders (bold dividers only on region boundaries via edge-centered-pivot `Image` strips) and a flat-2D depth kit (gradient backdrop + radial vignette + behind-panel drop shadow, statically cached).
 - Added procedural icon library (lightbulb/undo/trash/home/heart from SDF primitives, white-on-transparent so they tint via `Image.color`, statically cached) and themed icon buttons (tinted tile + dark icon + label) over plain white buttons.
-- AAA-casual action buttons are LAYERED, not flat. Recipe: SoftDisc drop-shadow (dark, offset down) + tintable ShadedCircle "ball" (grayscale with a top→bottom value gradient so a flat `Image.color` reads as 3D) + a SEPARATE white TopGloss specular overlay (key: multiply-tint can't brighten past the tint, so bake the specular as its own white low-alpha sprite on top) + bold white icon + label. Round glossy buttons w/ shadow beat flat pastel rects for the "made by a studio" feel.
-- Added Japanese-minimalist/zen art direction recipe (sumi-ink ground + washi panels + muted dentō-iro palette kept region-distinguishable + negative space + sumi-e/enso motifs, less gloss/saturation); the look flows from the palette so one theme ScriptableObject swap reskins the whole game.
+- AAA-casual action buttons are LAYERED, not flat. Recipe: SoftDisc drop-shadow (dark, offset down) + tintable ShadedCircle "ball" (grayscale with a top→bottom value gradient so a flat `Image.color` reads as 3D) + a SEPARATE white TopGloss specular overlay (key: multiply-tint can't brighten past the tint, so bake the specular as its own white low-alpha sprite on top) + bold white icon + label. This layered round-glossy-button-with-shadow recipe gives a dimensional, "made-by-a-studio" button when that's the look you want (keep buttons flat rects if the direction is minimal).
+- Added a cohesive themed art-direction recipe (theme-neutral: ground + panels + limited palette + negative space + signature motif; gloss/saturation matched to the theme); the look flows from the palette so one theme-object swap reskins the whole game.

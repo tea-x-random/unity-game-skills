@@ -5,9 +5,9 @@ These produce the reference artifacts and the conditioned production assets. The
 Reusable building block — define once in `style-guide.md`, paste everywhere:
 
 ```
-STYLE TOKEN = "flat cel-shaded, [warm pastel] palette, uniform [4px] [dark sumi] outline,
+STYLE TOKEN = "[your shading model, e.g. flat/cel/painterly], [your palette] palette, uniform [Npx] [your outline color] outline,
 single soft light from [top-left] with no rim light, round friendly shape language,
-clean edges, transparent background, [calm cozy minimal high-contrast] mood —
+clean edges, transparent background, [your mood words] mood —
 NOT busy, NOT glossy, NOT desaturated, NOT cluttered"
 ```
 
@@ -35,13 +35,13 @@ Flat 2D, front-on, generous negative space, no photographic texture, no text lab
 One sheet, multiple aligned views + expressions + color callouts. This becomes the single source of truth and the image-to-3D input.
 
 ```
-A character model / turnaround reference sheet for [CHARACTER, e.g. "a cozy cartoon dairy cow
-mascot"], laid out as ONE image on a plain light background.
+A character model / turnaround reference sheet for [CHARACTER — e.g. a friendly mascot],
+laid out as ONE image on a plain light background.
 Top row: orthographic turnaround — FRONT, 3/4, SIDE (profile), BACK views, all the SAME
 character, aligned on shared horizontal guide lines (top of head, eye line, shoulder), identical
 proportions and details across every view.
 Bottom-left: an expression set — [neutral, happy, thinking, celebrating].
-Bottom-right: a color-callout swatch key labeling each color used [body, spots, muzzle, hooves].
+Bottom-right: a color-callout swatch key labeling each color used [list the character's color regions].
 Proportion note: [~2.5 heads tall], chunky rounded body.
 Style: [STYLE TOKEN].
 Consistent lighting and palette across the whole sheet. Clean line art, flat fills, no background
@@ -53,10 +53,10 @@ For 3D handoff, also request a clean **T-pose, symmetrical, line-art, no color**
 **Mascot sheet add-on (token + mascot + icon on one sheet):**
 
 ```
-Also include three USE-SIZE crops of the same cow, on-model and identical in style:
+Also include three USE-SIZE crops of the same character, on-model and identical in style:
 (a) a tiny BOARD TOKEN version simplified to read clearly at ~8px (bold silhouette, minimal
 interior detail); (b) a MASCOT bust framed for a circular menu header; (c) an APP-ICON crop
-(cow centered, fills a rounded square, no transparency).
+(character centered, fills a rounded square, no transparency).
 All three must share the same palette, outline weight, shading, and lighting as the turnaround
 above — this sheet is the canon all three forms conform to.
 ```
@@ -74,7 +74,7 @@ home], [leaderboard / podium], [settings / gear], [heart].
 Every icon: SAME optical size within its cell, SAME [3px] stroke weight, SAME corner rounding,
 SAME palette, SAME flat lighting, SAME front-on perspective. Centered in each cell, even padding,
 transparent background.
-Style: [STYLE TOKEN]. [Dark sumi line on pastel fill]. Simple, legible at ~24-44px — minimal
+Style: [STYLE TOKEN]. [your line color on your fill]. Simple, legible at ~24-44px — minimal
 interior detail (these are read small, not zoomed). No text, no labels, no drop shadows.
 ```
 
@@ -87,11 +87,11 @@ After generation: judge the grid **at size**, side-by-side. One mismatched cell 
 Pass the canon sheet / style tile as the reference image (`-i`) and pin style verbatim. This is how every production asset is made — never from scratch.
 
 ```
-[run with: generate_image.py -i Assets/<YourGame>/Art/Refs/cow_model_sheet.png -p "<below>" -f Assets/.../cow_token.png -r 2K]
+[run with: generate_image.py -i Assets/<YourGame>/Art/Refs/character_model_sheet.png -p "<below>" -f Assets/.../character_token.png -r 2K]
 
 Using the attached reference sheet as the canonical character and art style, produce [ONE board
-token of the cow, facing front, simplified to read at ~8px]. Keep the SAME character identity,
-SAME palette, SAME [4px dark] outline, SAME flat cel shading, SAME single top-left light as the
+token of the character, facing front, simplified to read at ~8px]. Keep the SAME character identity,
+SAME palette, SAME [Npx outline] outline, SAME shading model, SAME single top-left light as the
 reference — do not restyle, do not add detail not on the sheet. [STYLE TOKEN].
 Single centered subject, transparent background, clean edges.
 ```
@@ -109,7 +109,7 @@ Reference-conditioning rules (Gemini / "nano-banana" family):
 
 ```
 [run with: -i <mascot_sheet.png>]
-Using the attached mascot sheet as canon, produce an iOS app icon: the [cow] centered, bold and
+Using the attached mascot sheet as canon, produce an iOS app icon: the [character] centered, bold and
 legible at thumbnail size, filling a rounded-square 1024x1024, SOLID background (NO transparency),
 same palette/outline/shading/lighting as the sheet. Strong silhouette, no small text. [STYLE TOKEN].
 ```

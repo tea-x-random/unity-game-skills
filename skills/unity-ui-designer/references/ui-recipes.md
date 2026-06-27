@@ -242,9 +242,9 @@ Decide required scripts UP FRONT (LiberationSans default = tofu for CJK). Build 
 
 ```csharp
 // Editor/loader code (runs via execute_code or an editor tool — not a committed runtime path):
-// 1. Build a DYNAMIC TMP_FontAsset for crisp SDF + runtime kanji.
+// 1. Build a DYNAMIC TMP_FontAsset for crisp SDF + runtime glyphs.
 var fa = TMP_FontAsset.CreateFontAsset(
-    sourceFont,                 // e.g. ZenMaruGothic (OFL, full JP coverage) — verify it has the script
+    sourceFont,                 // e.g. a Noto family font (OFL, covers the required script) — verify it has the script
     samplingPointSize: 110,     // high for crisp display type (Unity baseline 50–70 for plain Latin)
     atlasPadding: 11,           // ~1:10 of sampling; room for SDF gradient
     UnityEngine.TextCore.LowLevel.GlyphRenderMode.SDFAA,
@@ -256,7 +256,7 @@ var so = new UnityEditor.SerializedObject(TMP_Settings.instance);
 so.FindProperty("m_defaultFontAsset").objectReferenceValue = fa;
 so.ApplyModifiedProperties();
 // 3. (Mixed scripts) add fallbacks in priority order on fa.fallbackFontAssetTable: Latin -> CJK -> Symbols.
-// 4. (Many CJK glyphs at once) pre-warm on a loading screen: fa.TryAddCharacters("子牛牛雄和...");
+// 4. (Many glyphs at once) pre-warm on a loading screen: fa.TryAddCharacters("...needed glyphs...");
 ```
 
 After wiring, **screenshot a screen with the required script** and confirm real glyphs, not □ tofu. The example game regenerated this asset several times for crispness — settle it once, up front.

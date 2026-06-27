@@ -89,9 +89,9 @@ Then:
 - Keep a consistent art-direction across a family (same lighting, outline, palette).
 - Pack sprites into atlases; power-of-two max sizes; mipmaps off for crisp 2D, on for 3D textures.
 - Use ASTC on iOS; cap max texture size to the smallest that still looks sharp on device.
-- **CJK / non-Latin text needs a matching font.** Unity's default LiberationSans SDF has NO kanji/hiragana, so a label like 牛 renders as blank/tofu. To show Japanese you must import a CJK TMP font asset (e.g. Noto Sans JP); until that exists, use romaji. (Also relevant to `unity-ui-designer`.)
+- **Non-Latin text needs a font that covers the script.** Unity's default LiberationSans SDF has no glyphs for many scripts (CJK, Cyrillic, Arabic, etc.), so those labels render as blank "tofu" boxes. Import a TMP font asset that covers your target script (e.g. an appropriate Noto family font); until it exists, fall back to a supported script. (Also relevant to `unity-ui-designer`.)
 - Report prompts, output paths, import settings applied, and where each asset is used.
 
 ## Field notes & lessons
 
-- Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted CJK text needs a matching TMP font (default LiberationSans has no kanji/hiragana) — use romaji until imported.
+- Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted non-Latin text needs a matching TMP font (default LiberationSans has no glyphs for many scripts) — fall back to a supported script until imported.
