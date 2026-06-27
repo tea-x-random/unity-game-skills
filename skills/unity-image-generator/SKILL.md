@@ -57,7 +57,28 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
 - **Texture/material references and image-to-3D concepts:** front/side/back T-pose sheets, tiling material swatches — these feed `unity-3d-generator`.
 
-Iterate by passing the previous output via `--input-image` to refine (recolor, clean edges, add variants).
+## AAA prompt engineering (avoid flat/MS-Paint output)
+
+One-line prompts produce one-line art. A production prompt names, in order: **subject**; **view/framing** (top-down, 3/4, side, centered); **art style + 1–2 named touchstones**; **shape language** (chunky, rounded, angular); **material & color** with palette tokens (hex or named); **lighting** (direction + quality — e.g. soft key from upper-left, warm rim); **render fidelity** (high-detail, clean edges, subtle shading, baked ambient occlusion); **output spec** (transparent background OR seamless tiling, single subject, no text/UI); and a **negative prompt** (`NOT: flat single-color fill, MS-Paint, programmer art, jagged edges, muddy, blurry, watermark, text`).
+
+For the full template, full negative-prompt list, and per-genre exemplar prompts, see `../unity-aaa-graphics/references/prompt-library.md` — keep prompts here concise; the library has the depth.
+
+## Environment & terrain textures (most-missed assets)
+
+Top-down and side games need **real textured ground and paths, not flat color fills** — this is what removes most of the "amateur" look in tower-defense / top-down maps. Generate **seamlessly tiling** ground / path / tileset textures, e.g.:
+
+```
+seamless tiling stylized grass ground texture, top-down, hand-painted painterly style,
+soft varied green palette (#6Fae5a / #4f8a3e), subtle dirt patches and clumps, even soft
+lighting, high-detail, clean edges, no seams, no subject, no text — NOT: flat single-color
+fill, MS-Paint, harsh tiling seams
+```
+
+Import tiling textures with `wrapMode = TextureWrapMode.Repeat` and **mipmaps ON** for material/3D use (the opposite of UI sprites). Apply to a material's albedo and set tiling so the pattern repeats across the surface.
+
+## Refine loop (regenerate, don't just reroll)
+
+Generate at **1K** first to check composition. If framing/subject is wrong, **rewrite the prompt** (don't just reroll the same one). Once composition is right, refine at **2K** via `--input-image`, reusing **verbatim style tokens** (style name, touchstones, palette) to avoid drift across passes. Use the prompt-library's per-asset rubric to judge each pass. Iterating via `--input-image` also handles recolors, edge cleanup, and variants.
 
 ## Import into Unity (via unity-mcp-bridge)
 
@@ -86,6 +107,7 @@ Then:
 
 ## Quality & mobile rules
 
+- **Real generated art is the default for primary visible surfaces** (characters, props, ground, paths, backgrounds, UI). Procedural placeholder art is a *fallback only* when the key is MISSING or quota-blocked (see the billing-blocker note above) — not a first choice.
 - Keep a consistent art-direction across a family (same lighting, outline, palette).
 - Pack sprites into atlases; power-of-two max sizes; mipmaps off for crisp 2D, on for 3D textures.
 - Use ASTC on iOS; cap max texture size to the smallest that still looks sharp on device.

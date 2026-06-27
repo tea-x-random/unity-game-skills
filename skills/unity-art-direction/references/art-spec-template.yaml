@@ -1,0 +1,94 @@
+# art-spec.yaml — the locked single source of truth for a game's visual language.
+# Place at Assets/GameArt/_ArtDirection/art-spec.yaml. Approve BEFORE generating the first production asset.
+# Make intentional choices, then lock them — do not leave values generic. Values below are an EXAMPLE
+# (cozy_toy_diorama); replace with your project's deliberate choices.
+
+project: "PROJECT_NAME"
+style_id: "cozy_toy_diorama"      # pick exactly one from references/style-presets.md
+secondary_influence: null          # optional, one named secondary influence
+platform: "iOS"
+engine: "Unity 6 URP"
+
+camera:
+  projection: "orthographic"       # orthographic | perspective
+  angle: "3/4 top-down"
+  framing_rule: "hero object occupies 55-70% of a reward-card frame"
+
+shape_language:
+  primary: "rounded, slightly exaggerated, readable at thumbnail size"
+  avoid: ["needle-thin parts", "dense micro-detail", "realistic surface damage"]
+
+palette:
+  dominant: ["#F3D7A0", "#7FAF74", "#7BABC5"]
+  neutrals: ["#EDE6D7", "#5E5A55"]
+  accent: ["#E86E4F"]
+  max_high_chroma_accents_per_asset: 1
+
+materials:
+  response: "matte stylized PBR"
+  roughness_range: "0.55-0.85 except water/glass"
+  metallic_usage: "rare; reserved for deliberate reward/rarity signals"
+  texture_language: "broad hand-painted gradients; no photo texture noise"
+
+lighting:
+  key: "soft warm directional sun"
+  fill: "cool sky fill"
+  rim: "subtle; only on hero objects"
+  shadow: "soft, low-frequency, readable"
+  fog: "very subtle atmospheric depth only"
+
+rendering:
+  shader_family: "URP Lit with a shared stylized Shader Graph layer"
+  outline: "off by default; use only if globally enabled"
+  post: ["tonemapping", "subtle color adjustments"]
+
+scale:
+  unit_rule: "1 Unity unit = 1 meter"
+  character_height_m: 1.5
+  standard_door_height_m: 2.1
+
+# Mobile art budgets — caps per asset tier. Tune to the device target, but keep them as hard gates.
+mobile_budget:
+  hero_mesh_triangles: 12000
+  common_prop_triangles: 1500
+  small_prop_triangles: 500
+  texture_max_hero: 1024
+  texture_max_common: 512
+  texture_max_small: 256
+  max_materials_per_prop: 1
+  max_materials_per_hero: 2
+  target_fps: 60
+
+acceptance:
+  silhouette_readable_at_px: 96
+  asset_must_pass: ["style_match", "camera_match", "material_match", "mobile_budget", "in_game_screenshot"]
+
+# -----------------------------------------------------------------------------
+# AssetBrief template — write one per asset BEFORE calling an image/3D model.
+# -----------------------------------------------------------------------------
+# asset_id: "prop_mushroom_house_01"
+# asset_type: "interactive_environment_prop"
+# style_id: "cozy_toy_diorama"
+# gameplay_role: "safe home / destination landmark"
+# rarity_or_importance: "landmark"
+# scale_m: [4.0, 3.8, 4.5]
+# camera_distance: "medium"
+# required_views: ["beauty_3q", "front", "left", "back", "top"]
+# material_slots: ["body", "roof"]
+# animation: "none"
+# collision: "simple_box_and_capsule"
+# texture_budget: "1024"
+# negative_constraints:
+#   - "no characters"
+#   - "no baked text"
+#   - "no background scene"
+#   - "no floating elements"
+#   - "no excessive micro-detail"
+
+# -----------------------------------------------------------------------------
+# Suggested directory structure
+# -----------------------------------------------------------------------------
+# Assets/GameArt/
+#   _ArtDirection/   (art-spec.yaml, palettes/, references/)
+#   Characters/  Environment/  Props/  VFX/  UI/  Materials/  Shaders/  Prefabs/
+#   Generated/   (SourceImages/, TripoRaw/, CleanupQueue/)

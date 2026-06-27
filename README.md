@@ -1,7 +1,7 @@
 # Unity Game Skills
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-14-blue.svg)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-17-blue.svg)](#skill-catalog)
 [![Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2.svg)](https://docs.claude.com/en/docs/claude-code)
 
 A collection of **[Claude Agent Skills](https://docs.claude.com/en/docs/claude-code/skills)** for building **casual iOS games in Unity 6** with Claude (Claude Code, the desktop app, or the Agent SDK). The skills drive a live Unity Editor through [MCP for Unity](https://github.com/CoplayDev/unity-mcp), generate 2D/3D/audio assets from text prompts, and carry battle-tested checklists for graphics, UI, gameplay, monetization, QA, and App Store release.
@@ -69,6 +69,8 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 |-------|--------------|
 | **unity-gameplay-systems** | First-playable-slice scaffolding, C# architecture, Input System touch controls, scene/prefab assembly, scoring/spawning/pooling, difficulty curves, and game-feel juice (squash-stretch, screen shake, hit-stop, haptics). |
 | **unity-graphics** | Takes a flat/primitive scene to a premium look: URP setup, mobile lighting (baked + probes), materials/shaders, post-processing, and draw-call/overdraw budgets. |
+| **unity-aaa-graphics** | Visual-quality enforcement layer. Turns flat/"programmer-art" scenes into premium, store-quality visuals: art-direction critique, a mandatory per-surface asset-sourcing decision (generate real art for terrain, paths, units, props — not flat fills), an AAA prompt library with genre art kits, render polish, and a visual scorecard that fails amateur output. |
+| **unity-art-direction** | The art-direction *system*: a locked machine-readable `art-spec.yaml` single-source-of-truth, a 12-preset style library (concrete starting points), mobile art budgets (tri/texture/material caps), and a disciplined golden-asset → family production pipeline (concept → turnaround → 3D → cleanup → prefab → validation-scene → quality-gate scoring) so you ship an art-directed *game*, not a folder of pretty assets. |
 | **unity-ui-designer** | Screenshot-proven mobile UI: HUDs, menus, pause/win/lose/settings screens, safe-area/notch handling, 44pt touch targets, TextMeshPro, uGUI and UI Toolkit. |
 
 ### Assets (generative)
@@ -86,6 +88,7 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 |-------|--------------|
 | **unity-debug-profiler** | Evidence-driven debugging (compile errors, NullReference, pink materials, blank scenes) and profiling (frame rate, draw calls, GC, texture memory, IL2CPP stripping). |
 | **unity-monetization** | Ads integration: Google AdMob and Unity Ads direct, frequency-capped interstitials, rewarded ads, ATT + SKAdNetwork, and an SDK-agnostic ads facade. |
+| **unity-analytics-liveops** | Analytics & liveops: D1/D7/D30 retention and ARPDAU funnels, remote config + A/B testing, crash/analytics SDKs (Unity Gaming Services, GameAnalytics, Firebase), soft-launch measurement, and iOS ATT/SKAdNetwork/AdAttributionKit + privacy-manifest coordination — the levers that turn a playable game into a retentive, monetizable one. |
 | **unity-qa-release** | Play Mode / EditMode tests, device-resolution & safe-area checks, iOS build (IL2CPP/ASTC/Xcode), privacy manifest, TestFlight, fastlane signing, and release-risk reports. |
 | **unity-ios-secure-backend** | Anti-cheat leaderboards: Apple Game Center identity verification + App Attest, verified server-side by a Node/NestJS backend. |
 
@@ -169,7 +172,7 @@ done
 
 Start Claude Code and ask: *"What Unity skills do you have?"* — it should list the `unity-*` skills. Or run `/help` and look for the skills section.
 
-You don't need all 14. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
+You don't need all 17. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
 ---
 
@@ -236,6 +239,13 @@ You stay in control — review each phase, redirect, or ask for changes.
 
 See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results.
 
+### Designing for quality, retention & monetization
+
+- **Ask for real generated art on every surface**, not flat placeholders — terrain, paths, units, and props should be sourced art, not solid fills. The `unity-aaa-graphics` skill enforces this with a per-surface asset-sourcing decision and a visual scorecard.
+- **Pin an art-direction north-star early** — palette, style, and finish (flat vs glossy) — so every asset and screen stays on-model instead of drifting.
+- **Design for hybrid monetization (ads + IAP).** Only ~1.8% of players ever buy an IAP, so rewarded/interstitial ads carry most casual revenue — plan both, not one.
+- **Instrument retention (D1/D7/D30) and tune via remote config / A/B testing** rather than guessing. The `unity-analytics-liveops` skill covers the funnels, SDKs, and experiments.
+
 ---
 
 ## Prompting guide
@@ -269,6 +279,8 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-mcp-skill/
     ├── unity-gameplay-systems/
     ├── unity-graphics/
+    ├── unity-aaa-graphics/
+    ├── unity-art-direction/
     ├── unity-ui-designer/
     ├── unity-image-generator/
     ├── unity-3d-generator/
@@ -276,6 +288,7 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-asset-designer/
     ├── unity-debug-profiler/
     ├── unity-monetization/
+    ├── unity-analytics-liveops/
     ├── unity-qa-release/
     └── unity-ios-secure-backend/
 ```

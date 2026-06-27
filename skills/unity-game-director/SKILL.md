@@ -110,7 +110,7 @@ This is the standard "prototype the riskiest thing first / find the fun before y
 
 ## Step 2.6 — Aesthetic direction is a first-class EARLY deliverable
 
-A reference casual game's look churned through many passes (several distinct directions and multiple palette/typography reworks; glossy buttons → flat and back) because no named visual target was agreed up front — every pass was a fresh guess at "what does *pleasing* mean here." Fix: pin the aesthetic target as an explicit deliverable at concept time, the same way you pin gameplay scope, then converge in **1–2 passes** with a rubric and screenshots instead of many. Most designs converge within two iterations *when there is a target to converge toward* ([design review iteration](https://www.markup.io/blog/design-review-checklist/)).
+A reference casual game's look churned through many passes (several distinct directions and multiple palette/typography reworks; glossy buttons → flat and back) because no named visual target was agreed up front — every pass was a fresh guess at "what does *pleasing* mean here." Fix: pin the aesthetic target as an explicit deliverable at concept time, the same way you pin gameplay scope, then converge in **1–2 passes** with a rubric and screenshots instead of many. Most designs converge within two iterations *when there is a target to converge toward* ([design review iteration](https://www.markup.io/blog/design-review-checklist/)). For a structured way to capture this north-star, route to `unity-art-direction`, which records it as a locked, machine-readable `art-spec.yaml` single-source-of-truth (style preset, palette, materials, lighting, scale, mobile budgets, acceptance) before any art is mass-generated.
 
 1. **Agree a named visual north-star up front (a genuine branch point — ask the user).** Capture it in the ledger as a short, concrete art-direction statement, not an adjective:
    - **Reference style:** a named style + 1–2 real touchstones — pick what fits your game, with no single style as the default (e.g. flat-pastel à la *Two Dots* / *I Love Hue*, glossy candy à la *Royal Match*, minimal ink, or neon-retro). A mood board / reference set is the standard alignment tool — it pins tone, palette, and texture before any asset is made and prevents exactly this kind of churn ([Milanote — game design mood board](https://milanote.com/guide/game-design-moodboard); [Numberanalytics — mood boards in game art](https://www.numberanalytics.com/blog/ultimate-guide-mood-boards-game-art)).
@@ -132,7 +132,7 @@ A reference casual game's look churned through many passes (several distinct dir
 4. **Menu & text consistency** is owned by `unity-ui-designer` (recurring menu/typography drift was fixed there — display-name single-sourcing, safe-area, TMP font setup, 44pt targets). Cross-reference it from the orchestration checklist below; do not re-derive UI rules here.
 
 
-## External Asset Sourcing Gate
+## Visual Quality Gate (art is first-class)
 
 Before claiming a generator key is unavailable, run the credential probe and paste its literal output:
 
@@ -141,7 +141,21 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 # -> TRIPO_API_KEY=SET|MISSING / GEMINI_API_KEY=SET|MISSING / ELEVENLABS_API_KEY=SET|MISSING
 ```
 
-"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. For a premium claim, at least one hero/high-value surface (player, enemy, signature prop, hero sprite, title art) should use a real generated asset with evidence: a Tripo task ID + imported GLB/FBX path, or a generated sprite/texture path — unless an allowed skip applies (user asked offline-only, key MISSING, real API/quota error with the command shown, or a repeated low-value prop better done procedurally / by atlas instancing).
+"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`.
+
+**Real generated art is the DEFAULT for EVERY primary visible surface — not one hero asset.** Each surface the player actually looks at should be a real generated/sourced asset with evidence (a Tripo task ID + imported GLB/FBX path, or a generated sprite/texture path): the background/terrain/ground, the path/track, the player, enemies/obstacles, towers/units, signature props, and the key UI. A single generated hero amid untextured everything-else is NOT a premium scene.
+
+**Procedural / runtime shapes are a FALLBACK, not the default.** They are acceptable only when a key is `MISSING`/quota-blocked (show the literal evidence) or for genuinely low-value repeated props where an atlas / GPU instancing is the right call. A procedural placeholder is never "premium," "polished," or "AAA."
+
+**Amateur-look auto-fail anti-patterns.** If a screenshot shows any of these, the visuals FAIL — do not call them done:
+- flat solid-color ground or background,
+- procedural primitive blobs (cubes/spheres/capsules) standing in for primary surfaces,
+- one generated asset surrounded by untextured everything-else,
+- a hard-oval vignette used as the only "lighting."
+
+**Route premium visual work to `unity-aaa-graphics`.** For any premium / polished / AAA / "make it look good" / "looks basic" request, or whenever a screenshot trips the anti-patterns above, hand off to `unity-aaa-graphics`. It owns the per-surface asset-sourcing decision, the AAA prompt library + genre art kits, render polish, and the visual scorecard that fails flat/programmer-art scenes.
+
+**Allowed skips** (the only valid reasons to ship a surface without real art): user explicitly asked offline-only, the probe shows the key `MISSING`, a real API/quota error with the command shown, or a repeated low-value prop better done procedurally / by atlas instancing.
 
 ## Phase Routing
 
@@ -151,6 +165,9 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 - `unity-image-generator`: 2D sprites, sprite sheets, UI art, backgrounds, icons, textures, image-to-3D inputs.
 - `unity-audio-generator`: SFX, loops/music, UI sounds, voice/TTS → import as AudioClips.
 - `unity-graphics`: basic-looking scenes → URP setup, lighting, materials, mobile-safe post, visual quality.
+- `unity-aaa-graphics`: premium/AAA visual upgrades — art-direction critique, mandatory per-surface asset sourcing, AAA prompt library + genre art kits, render polish, and a visual scorecard gate that fails flat/programmer-art scenes. Route here for any "make it look good / premium / looks basic" request.
+- `unity-art-direction`: the structured art-direction system — establish/approve a locked `art-spec.yaml` (style preset, palette, materials, lighting, scale, mobile budgets, acceptance), then run the golden-asset/family production pipeline with quality-gate scoring. Use at concept time to lock the visual language before mass-generating art.
+- `unity-analytics-liveops`: analytics & retention instrumentation (D1/D7/D30, ARPDAU funnels), remote config + A/B testing, crash/analytics SDKs, soft-launch measurement, iOS ATT/SKAdNetwork/AdAttributionKit and privacy-manifest coordination — the levers that turn a playable game into a retentive, monetizable one.
 - `unity-ui-designer`: HUD, menus, overlays, pause/win/lose, settings, responsive + safe-area touch UI. **Owns menu & text consistency** (label single-sourcing, TMP font setup, typography scale, no-tofu) — route all recurring menu/text-drift issues here rather than fixing them ad hoc.
 - `unity-debug-profiler`: blank scene / null refs / compile errors, domain-reload recovery, profiler, draw calls, memory, mobile thermal/perf.
 - `unity-qa-release`: Play Mode + EditMode tests, device-resolution checks, iOS build pipeline, App Store / privacy-manifest readiness, release risks.
@@ -160,7 +177,7 @@ If a sibling file cannot be loaded, record the path/reason and use this director
 ## Verification (a phase is done only with evidence)
 
 - Project compiles clean: `read_console(types=["error"])` empty after the last script change.
-- Play Mode runs: `manage_editor(action="play")` → `read_console` clean → `manage_scene(action="screenshot")` shows a real, non-primitive scene → `stop`.
+- Play Mode runs: `manage_editor(action="play")` → `read_console` clean → `manage_scene(action="screenshot")` shows a real scene that PASSES the `unity-aaa-graphics` visual scorecard (textured primary surfaces, asset cohesion, real lighting/depth) — not merely "non-primitive" → `stop`.
 - Core loop reachable: input → objective → win/lose or restart path exercised (ideally a PlayMode test via `run_tests` + `get_test_job`).
 - Tests green before "done": EditMode/PlayMode via the `testing` group.
 - iOS readiness for release claims: IL2CPP backend, ASTC textures, deployment target >= iOS 13, bundle id/product/version set, Xcode project builds. Signing/`.ipa` is a manual macOS+Xcode step — flag it, do not claim it done.

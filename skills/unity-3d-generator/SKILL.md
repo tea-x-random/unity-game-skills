@@ -50,6 +50,14 @@ python3 ~/.claude/skills/unity-3d-generator/scripts/unity_3d_asset.py character-
 
 Postprocess (texture / rig / animate / convert / stylize), rigging reliability rules (T/A-pose, prerigcheck-first, rig version by body plan, never `--animate-in-place`), and creature stance rules are unchanged from the proven pipeline — load `references/api-notes.md` before any postprocess/rig/animation work.
 
+## Prompt quality (game-ready, on-model)
+
+A premium, on-model model starts with a premium prompt — generic prompts give blobs. Name, in order: **subject**; **art style + 1–2 named touchstones**; **shape language / silhouette readability**; **material & palette**; and **detail/fidelity** ("clean low-poly, readable silhouette, game-ready, PBR, centered pivot, no text"). Always include negatives — **NOT: blobby, off-model, jagged, low-detail**.
+
+For best on-model results, prefer **image-to-3D conditioned on a turnaround/concept sheet from `unity-asset-designer`** over bare text-to-3D — the sheet locks proportions, palette, and silhouette so the mesh matches canon. See `../unity-aaa-graphics/references/prompt-library.md` for the full AAA template and per-genre art kits/exemplars.
+
+Refine: if the silhouette is wrong, regenerate the prompt (not just re-roll the seed); reuse the verbatim style tokens that already produced on-model results.
+
 ## Import into Unity (the part that is Unity-specific)
 
 After download, the file is in `Assets/`. **Refresh and configure import settings — do not trust defaults.** Load `references/unity-import.md` for the full recipe. Short version, driven through `unity-mcp-bridge`:

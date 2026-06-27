@@ -21,6 +21,15 @@ Wire ads into a casual iOS game **without breaking the build or lying about whet
 
 Confirm the Editor is reachable (`mcpforunity://editor/state`, `ready_for_tools==true`) before driving any of this through MCP; for the CocoaPods build itself, route to `unity-qa-release`.
 
+## 2025-2026 casual monetization strategy (hybrid by default)
+
+The single-network mechanics below are still how you wire ads — but the *strategy* they serve has consolidated. For casual / hybrid-casual on iOS, **hybrid monetization (IAP + ads) is now the default, not an upsell**: ~72%+ of developers run both, because only **~1.8% of F2P players ever make an IAP** — so ads monetize the ~98% who never pay, while IAP (including a "remove ads" purchase) monetizes the rest. A typical mature mix lands around **~40-50% IAP / ~50-60% ads** ([game growth advisor](https://gamegrowthadvisor.com/blog/2026-04-02-f2p-monetization-models-comparison-2026/), [gamigion hybrid-casual overview](https://www.gamigion.com/2025-hybridcasual-market-overview-with-real-data/)). Plan for both revenue streams from the start; a pure-ads or pure-IAP casual game is leaving most of the table.
+
+- **Rewarded video is the core casual ad format — and the highest-eCPM format** (Rewarded > Interstitial > others). Design *natural* rewarded placements players opt into: continue/revive, double-coins, free-spin ([TopOn 2025 H1 report](https://mores.toponad.com/reports/TopOn%20Global%20Mobile%20Games%20Monetization%20Report%20_%202025%20H1.pdf)). The injectable-time cadence policy below generalizes to rewarded triggers too.
+- **More ads ≠ more revenue.** Over-serving hurts **both retention and eCPM**, so don't chase a fixed cadence number — tune frequency by **measuring ARPDAU and retention**, not by a hardcoded cadence ([tap-nation KPIs](https://www.tap-nation.io/blog/kpis-that-matter-metrics-to-track-in-hybrid-casual-games/)). Cross-reference `unity-analytics-liveops` for ARPDAU, retention funnels, and remote-config-driven ad-cadence A/B tests.
+- **Mediation reality (context for the LevelPlay vs MAX vs direct decision below).** **AppLovin MAX dominates** ad mediation — ~73% of top-*downloaded* games and ~55% of top-*grossing*; LevelPlay/ironSource is more competitive on grossing (~25%) than on downloads; AdMob sits ~11-13% ([gamebiz consulting newsletter](https://www.gamebizconsulting.com/newsletter/newsletter-may25)). This doesn't override our friction-ordered pick (we shipped Unity Ads direct, AdMob now) — it's the market backdrop: MAX is where most of the ecosystem optimizes fill/eCPM.
+- **ATT shifted ad revenue toward Android; measure iOS without IDFA.** Post-ATT, iOS is now ~43% of mobile-game ad revenue vs Android ~57%, and iOS attribution must rely on **SKAdNetwork / AdAttributionKit, not IDFA** ([Tenjin 2026 ad-mon report](https://tenjin.com/blog/ad-mon-gaming-2026/)). This is *why* the non-personalized / no-ATT posture below is viable, and why the SKAdNetwork plist work is load-bearing rather than optional.
+
 ## Google AdMob (iOS) — the path we ship now
 
 GMA `com.google.ads.mobile` **11.2.0** (Unity 6000.5.0f1, built-in pipeline). Full annotated integration in `references/admob-ios.md`; the load-bearing gotchas:
@@ -39,7 +48,7 @@ Shipped files: `Assets/<YourGame>/Scripts/Game/Net/Ads.cs` (facade), `.../Net/Ad
 
 Factor WHEN-to-show out of the SDK shell into an engine-free policy class (`YourGame.Core/AdCadence.cs`, 19 green EditMode tests). Full detail in `references/ad-cadence-policy.md`:
 
-- **Dual OR trigger:** show when **(games-since-last-ad ≥ N)** OR **(seconds-since-last-ad-or-app-open ≥ T)** — count monetizes quick back-to-back games, time monetizes one long session. Example values: `GamesPerAd=2`, `MinSessionGapSeconds=300` (inclusive boundary).
+- **Dual OR trigger:** show when **(games-since-last-ad ≥ N)** OR **(seconds-since-last-ad-or-app-open ≥ T)** — count monetizes quick back-to-back games, time monetizes one long session. Example values: `GamesPerAd=2`, `MinSessionGapSeconds=300` (inclusive boundary). These are starting points, not gospel: the right cadence is the one your **ARPDAU-vs-retention** data supports, tuned via remote-config A/B — not a hardcoded number (see `unity-analytics-liveops`).
 - **Injected time:** the policy takes `now` (seconds) as an argument; the MonoBehaviour supplies `Time.realtimeSinceStartupAsDouble`. Fully deterministic → plain unit tests, no Play Mode / SDK.
 - **Decision vs commit:** `RegisterGameFinishedAndShouldShow(now)` decides; `MarkShown(now)` resets both triggers and is called **only when an ad actually displays**. If the ad isn't loaded you skip `MarkShown`, so the **"owed ad"** shows as soon as one is ready (counter keeps climbing). `MarkAppOpen(now)` resets only the time baseline. Promote this "pure injectable-time policy + thin SDK shell" as the default for frequency capping — it generalizes to rewarded/banner cadence.
 
