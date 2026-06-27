@@ -69,6 +69,8 @@ Surfaces: **tiling ground texture**, **textured path/track**, **build-slot tiles
 
 > The classic TD amateur look = flat green fill + flat tan path + translucent square slots + one castle. Replace the **ground, path, and slots with real textures** and add **scatter props** first — that alone removes most of the MS-Paint read.
 
+> Acting assets need animation states. Archer/tower: generate an idle + aim + fire frame strip (2D) or rig + idle/aim/fire cycles (3D); see `../../unity-animation/SKILL.md`. The fire clip must release the projectile on the loose frame via an Animation Event.
+
 Exemplar — tower:
 ```
 A stylized [stone-and-crystal] defense tower, top-down 45° orthographic view, centered,

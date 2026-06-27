@@ -1,7 +1,7 @@
 # Unity Game Skills
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-17-blue.svg)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-18-blue.svg)](#skill-catalog)
 [![Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2.svg)](https://docs.claude.com/en/docs/claude-code)
 
 A collection of **[Claude Agent Skills](https://docs.claude.com/en/docs/claude-code/skills)** for building **casual iOS games in Unity 6** with Claude (Claude Code, the desktop app, or the Agent SDK). The skills drive a live Unity Editor through [MCP for Unity](https://github.com/CoplayDev/unity-mcp), generate 2D/3D/audio assets from text prompts, and carry battle-tested checklists for graphics, UI, gameplay, monetization, QA, and App Store release.
@@ -71,6 +71,7 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 | **unity-graphics** | Takes a flat/primitive scene to a premium look: URP setup, mobile lighting (baked + probes), materials/shaders, post-processing, and draw-call/overdraw budgets. |
 | **unity-aaa-graphics** | Visual-quality enforcement layer. Turns flat/"programmer-art" scenes into premium, store-quality visuals: art-direction critique, a mandatory per-surface asset-sourcing decision (generate real art for terrain, paths, units, props — not flat fills), an AAA prompt library with genre art kits, render polish, and a visual scorecard that fails amateur output. |
 | **unity-art-direction** | The art-direction *system*: a locked machine-readable `art-spec.yaml` single-source-of-truth, a 12-preset style library (concrete starting points), mobile art budgets (tri/texture/material caps), and a disciplined golden-asset → family production pipeline (concept → turnaround → 3D → cleanup → prefab → validation-scene → quality-gate scoring) so you ship an art-directed *game*, not a folder of pretty assets. |
+| **unity-animation** | Makes assets *move* — AAA, gameplay-synced animation via 2D sprite sheets or 3D skeletal (Tripo) rigs. Per-role clip catalog (idle/move/attack/hit/death; tower idle/aim/fire), Unity Animator/state-machine/blend-tree wiring, and Animation Events that fire gameplay on the right frame (release the arrow on the loose frame). A static asset where motion is expected fails the bar. |
 | **unity-ui-designer** | Screenshot-proven mobile UI: HUDs, menus, pause/win/lose/settings screens, safe-area/notch handling, 44pt touch targets, TextMeshPro, uGUI and UI Toolkit. |
 
 ### Assets (generative)
@@ -172,7 +173,7 @@ done
 
 Start Claude Code and ask: *"What Unity skills do you have?"* — it should list the `unity-*` skills. Or run `/help` and look for the skills section.
 
-You don't need all 17. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
+You don't need all 18. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
 ---
 
@@ -281,6 +282,7 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-graphics/
     ├── unity-aaa-graphics/
     ├── unity-art-direction/
+    ├── unity-animation/
     ├── unity-ui-designer/
     ├── unity-image-generator/
     ├── unity-3d-generator/

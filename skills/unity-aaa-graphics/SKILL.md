@@ -33,6 +33,8 @@ Pin a concrete north-star (reference style + 4–7 color palette with roles + li
 ### 2. Enumerate EVERY visible surface, then decide source per surface (mandatory)
 List the full visible surface set for the genre (see genre kits in `references/prompt-library.md`), and for **each** make an explicit generate-vs-procedural decision. **Default to generate.** Procedural only if: key `MISSING`/quota-blocked (show the probe output), or a genuinely low-value repeated element better done by atlas/instancing.
 
+The per-surface source choice is **Gemini vs Tripo-pre-render**, not just generate-vs-procedural. For characters, units, and animated actors, a pre-rendered Tripo 3D model is often the premium, consistent choice **even in a 2D game** — one rendered model holds identity across frames and angles and animates without drift, where independently generated sprites diverge (see `unity-3d-generator` pre-render pipeline). Use Gemini for tiling surfaces, backgrounds, UI, and single-angle art.
+
 Example for **tower defense** — all of these are "generate," not "fill with green":
 - **Ground/terrain** → a tiling textured ground (grass/sand/stone with variation), not a flat color.
 - **Path/track** → a textured road/path tile or spline texture with edges/borders.
@@ -67,8 +69,9 @@ Capture a real device-resolution screenshot via MCP and score 1–10 on each axi
 | **Finish consistency** | Every element flat *or* every element rendered — never mixed |
 | **Readability** | Gameplay-critical elements (path, towers, enemies) pop against the ground |
 | **HUD/UI quality** | Designed readouts/buttons, on-theme — not default labels on flat bars |
+| **Animation** | Assets that act are animated (idle/move/attack/hit/death as needed); actions fire gameplay on the correct frame — nothing static where motion is expected |
 
-Auto-fail anti-patterns (ship-blockers): flat solid-color ground; procedural blobs for primary surfaces; one generated asset amid untextured everything-else; hard-oval vignette as the only "lighting."
+Auto-fail anti-patterns (ship-blockers): flat solid-color ground; procedural blobs for primary surfaces; one generated asset amid untextured everything-else; hard-oval vignette as the only "lighting"; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
 
 ## Where this sits
 
@@ -77,6 +80,7 @@ Auto-fail anti-patterns (ship-blockers): flat solid-color ground; procedural blo
 - **`unity-image-generator`** — 2D sprites, **environment textures/tilesets**, UI; the AAA prompt library lives alongside it and here.
 - **`unity-3d-generator`** — 3D models/props.
 - **`unity-graphics`** — the URP render-pipeline mechanics (lighting/material/post) this skill requires you to actually apply.
+- `unity-animation` — animates assets (2D sprite / 3D skeletal) and fires gameplay on the correct frame; static actors fail this skill's scorecard.
 - **`unity-game-director`** — owns the Visual Quality Gate and routes premium/AAA requests here.
 
 ## Field notes & lessons

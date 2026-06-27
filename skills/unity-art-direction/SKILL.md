@@ -22,7 +22,7 @@ This skill is the **system**: the locked spec, the style-preset catalog, the mob
 3. **Keep style ≠ genre ≠ camera distinct.** (Style: painterly cel fantasy. Genre: cozy puzzle. Camera: orthographic 3/4.)
 4. **One asset, one primary material language.** Don't mix glossy realism, flat toon, hand-painted gradient, and noisy PBR arbitrarily.
 5. **The Unity screenshot is the acceptance test.** A gorgeous source image that fails in the real camera, lighting, or device budget is **rejected** — capture it in `ArtValidationScene` and score it.
-6. **Use 3D only where it earns its cost.** On iOS, prefer 2D cards/decals/billboards/baked backgrounds unless parallax, animation, interactivity, silhouette, or depth materially improves the game.
+6. **Use 3D only where it earns its cost.** On iOS, prefer 2D cards/decals/billboards/baked backgrounds unless parallax, animation, interactivity, silhouette, or depth materially improves the game. Distinguish **runtime 3D** (use sparingly on iOS) from **production 3D used as a tool to pre-render premium 2D sprites/animation** (encouraged — one rigged model gives drift-free frames; see `unity-3d-generator` pre-render pipeline).
 
 ## The art spec — single source of truth
 

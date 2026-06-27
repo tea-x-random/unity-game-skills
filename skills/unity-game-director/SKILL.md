@@ -141,17 +141,20 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 # -> TRIPO_API_KEY=SET|MISSING / GEMINI_API_KEY=SET|MISSING / ELEVENLABS_API_KEY=SET|MISSING
 ```
 
-"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`.
+"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. The probe checks **both** `GEMINI_API_KEY` and `TRIPO_API_KEY` — for premium character/prop/animated assets, consider Tripo (including **pre-rendering Tripo models to sprites for 2D games**, see `unity-3d-generator` "Use Tripo for 2D games too"), don't default to Gemini-only 2D generation.
 
 **Real generated art is the DEFAULT for EVERY primary visible surface — not one hero asset.** Each surface the player actually looks at should be a real generated/sourced asset with evidence (a Tripo task ID + imported GLB/FBX path, or a generated sprite/texture path): the background/terrain/ground, the path/track, the player, enemies/obstacles, towers/units, signature props, and the key UI. A single generated hero amid untextured everything-else is NOT a premium scene.
 
 **Procedural / runtime shapes are a FALLBACK, not the default.** They are acceptable only when a key is `MISSING`/quota-blocked (show the literal evidence) or for genuinely low-value repeated props where an atlas / GPU instancing is the right call. A procedural placeholder is never "premium," "polished," or "AAA."
 
+**Animation is part of the bar — assets that ACT must move.** Any asset that acts in the game (characters, enemies, towers, interactables) must be animated with the states its role requires (idle/move/attack/hit/death; towers idle/aim/fire), and any action with a gameplay effect must fire that effect on the correct animation frame (release the arrow on the loose frame, deal damage on the contact frame) — not on raw input. Route animation work to `unity-animation`.
+
 **Amateur-look auto-fail anti-patterns.** If a screenshot shows any of these, the visuals FAIL — do not call them done:
 - flat solid-color ground or background,
 - procedural primitive blobs (cubes/spheres/capsules) standing in for primary surfaces,
 - one generated asset surrounded by untextured everything-else,
-- a hard-oval vignette used as the only "lighting."
+- a hard-oval vignette used as the only "lighting,"
+- a static asset where motion is expected (e.g. a tower/enemy/character with no idle/attack/death), or a projectile/damage that fires on input instead of on the animation's release/contact frame.
 
 **Route premium visual work to `unity-aaa-graphics`.** For any premium / polished / AAA / "make it look good" / "looks basic" request, or whenever a screenshot trips the anti-patterns above, hand off to `unity-aaa-graphics`. It owns the per-surface asset-sourcing decision, the AAA prompt library + genre art kits, render polish, and the visual scorecard that fails flat/programmer-art scenes.
 
@@ -167,6 +170,7 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 - `unity-graphics`: basic-looking scenes → URP setup, lighting, materials, mobile-safe post, visual quality.
 - `unity-aaa-graphics`: premium/AAA visual upgrades — art-direction critique, mandatory per-surface asset sourcing, AAA prompt library + genre art kits, render polish, and a visual scorecard gate that fails flat/programmer-art scenes. Route here for any "make it look good / premium / looks basic" request.
 - `unity-art-direction`: the structured art-direction system — establish/approve a locked `art-spec.yaml` (style preset, palette, materials, lighting, scale, mobile budgets, acceptance), then run the golden-asset/family production pipeline with quality-gate scoring. Use at concept time to lock the visual language before mass-generating art.
+- `unity-animation`: AAA gameplay-synced animation (2D sprite or 3D skeletal) — per-role clip catalog (idle/move/attack/hit/death, tower idle/aim/fire), Animator wiring, and Animation Events that fire gameplay on the correct frame. Every asset that acts must be animated.
 - `unity-analytics-liveops`: analytics & retention instrumentation (D1/D7/D30, ARPDAU funnels), remote config + A/B testing, crash/analytics SDKs, soft-launch measurement, iOS ATT/SKAdNetwork/AdAttributionKit and privacy-manifest coordination — the levers that turn a playable game into a retentive, monetizable one.
 - `unity-ui-designer`: HUD, menus, overlays, pause/win/lose, settings, responsive + safe-area touch UI. **Owns menu & text consistency** (label single-sourcing, TMP font setup, typography scale, no-tofu) — route all recurring menu/text-drift issues here rather than fixing them ad hoc.
 - `unity-debug-profiler`: blank scene / null refs / compile errors, domain-reload recovery, profiler, draw calls, memory, mobile thermal/perf.
@@ -177,7 +181,7 @@ If a sibling file cannot be loaded, record the path/reason and use this director
 ## Verification (a phase is done only with evidence)
 
 - Project compiles clean: `read_console(types=["error"])` empty after the last script change.
-- Play Mode runs: `manage_editor(action="play")` → `read_console` clean → `manage_scene(action="screenshot")` shows a real scene that PASSES the `unity-aaa-graphics` visual scorecard (textured primary surfaces, asset cohesion, real lighting/depth) — not merely "non-primitive" → `stop`.
+- Play Mode runs: `manage_editor(action="play")` → `read_console` clean → `manage_scene(action="screenshot")` shows a real scene that PASSES the `unity-aaa-graphics` visual scorecard (textured primary surfaces, asset cohesion, real lighting/depth) — not merely "non-primitive" → `stop`. Confirm key acting assets are animated (idle/move/attack as the role requires), not static/T-pose, with gameplay effects firing on the correct animation frame.
 - Core loop reachable: input → objective → win/lose or restart path exercised (ideally a PlayMode test via `run_tests` + `get_test_job`).
 - Tests green before "done": EditMode/PlayMode via the `testing` group.
 - iOS readiness for release claims: IL2CPP backend, ASTC textures, deployment target >= iOS 13, bundle id/product/version set, Xcode project builds. Signing/`.ipa` is a manual macOS+Xcode step — flag it, do not claim it done.

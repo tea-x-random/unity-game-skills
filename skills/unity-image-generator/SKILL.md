@@ -7,6 +7,10 @@ description: "Generate and edit 2D image assets for Unity casual games using Goo
 
 Generate 2D art with Gemini, then import it into Unity correctly for sprites, UI, or textures. This is the primary asset skill for **2D casual iOS games**, and the concept/reference source for image-to-3D.
 
+## Gemini vs Tripo — pick the right tool
+
+Use Gemini (this skill) for concepts, tiling ground/textures, backgrounds, UI, icons, and 2D art that doesn't need multiple angles. But for **characters, props, and animated actors — even in a 2D game** — prefer generating a 3D model with Tripo and **rendering it to sprites** (`unity-3d-generator` → "Use Tripo for 2D games too" + `../unity-3d-generator/references/prerender-2d.md`). One rendered model gives consistent identity across frames and angles and drift-free animation, whereas independently generating each sprite/frame with an image model drifts. Reach for Tripo pre-render first on anything that needs multiple poses, turnaround consistency, or motion; reach for Gemini on everything else.
+
 ## API key & script
 
 Key resolution: `--api-key`, then `GEMINI_API_KEY`. Probe first:
@@ -51,7 +55,7 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 ## What to generate for casual games
 
 - **Sprites / characters / props:** request transparent background, single centered subject, consistent style, clean edges. For pixel art, ask for crisp pixels and a fixed palette.
-- **Sprite sheets:** request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell).
+- **Sprite sheets:** request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell). For animated assets, generate per-state frame strips (idle/walk/attack) and `unity-animation` slices them into Animation Clips + an Animator with frame-synced events.
 - **Backgrounds / parallax layers:** request seamless or full-bleed layers sized to portrait phone aspect (e.g. 1080×1920 framing).
 - **UI:** buttons, panels, frames, progress bars, currency/HUD icons, settings glyphs — flat, high-contrast, readable at small size, transparent background. Keep a consistent icon family.
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
