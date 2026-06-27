@@ -141,7 +141,7 @@ These are Claude Agent Skills. Install them where Claude Code looks for skills.
 Available in every project on your machine:
 
 ```bash
-git clone https://github.com/tea-x-random/unity-game-director.git
+git clone https://github.com/tea-x-random/unity-game-skills.git
 mkdir -p ~/.claude/skills
 cp -R unity-game-director/skills/unity-* ~/.claude/skills/
 ```
@@ -151,7 +151,7 @@ cp -R unity-game-director/skills/unity-* ~/.claude/skills/
 Scoped to one repo (commit them with your game, or add to `.gitignore`):
 
 ```bash
-git clone https://github.com/tea-x-random/unity-game-director.git
+git clone https://github.com/tea-x-random/unity-game-skills.git
 mkdir -p /path/to/your-game/.claude/skills
 cp -R unity-game-director/skills/unity-* /path/to/your-game/.claude/skills/
 ```
@@ -159,7 +159,7 @@ cp -R unity-game-director/skills/unity-* /path/to/your-game/.claude/skills/
 ### Option C — symlink (stay up to date with `git pull`)
 
 ```bash
-git clone https://github.com/tea-x-random/unity-game-director.git ~/src/unity-game-skills
+git clone https://github.com/tea-x-random/unity-game-skills.git ~/src/unity-game-skills
 for d in ~/src/unity-game-skills/skills/unity-*; do
   ln -s "$d" ~/.claude/skills/"$(basename "$d")"
 done

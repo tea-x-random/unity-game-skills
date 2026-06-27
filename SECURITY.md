@@ -6,7 +6,7 @@ If you find a security issue — or notice a secret, API key, private project
 identifier, or other sensitive value that slipped into a skill — please **do not
 open a public issue**. Instead:
 
-1. Open a [GitHub Security Advisory](https://github.com/tea-x-random/unity-game-director/security/advisories/new), or
+1. Open a [GitHub Security Advisory](https://github.com/tea-x-random/unity-game-skills/security/advisories/new), or
 2. Contact the maintainer privately via the email on the GitHub profile.
 
 We'll acknowledge, confirm, and remediate (including a history rewrite if a
