@@ -90,6 +90,8 @@ Load the asset generators before deciding "assets not needed" when the game has 
 
 - `unity-3d-generator/SKILL.md`, `unity-image-generator/SKILL.md`, `unity-audio-generator/SKILL.md`.
 
+**Phase ordering for foundations & design.** For a new or team project, establish `unity-project-setup` **first** — source control (.gitignore/LFS/meta-file discipline), folder + asmdef architecture, package management, versioning, secrets-per-env, and CI/CD basics — before scaffolding gameplay, so the engine-free Core asmdef and clean git history exist from day one. And route `unity-game-economy` in at **design/concept time alongside Step 2.x** (with the aesthetic north-star and novel-mechanic scoping): the economy & meta-progression — currencies, sources/sinks, progression pacing, reward schedules, IAP catalog — shape the core loop, so design them up front rather than bolting them on after a slice exists.
+
 ## Step 2.5 — Scope a novel or ambiguous mechanic BEFORE building it
 
 Trigger this whenever a request names a mechanic you cannot fully simulate in your head — anything "unusual," "new," a twist on a known genre, or where you'd be guessing at the rules (a reference puzzle game's cross-face "Cube" mechanic is the canonical example: the director jumped to building, and the first rule designs were so under-constrained the puzzle had ~14,000 solutions — only *measured* after building). Do NOT start art/UX/scene work until this gate passes. The cost of skipping it was multiple full rule redesigns plus repeated rendering reworks.
@@ -175,6 +177,10 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 - `unity-ui-designer`: HUD, menus, overlays, pause/win/lose, settings, responsive + safe-area touch UI. **Owns menu & text consistency** (label single-sourcing, TMP font setup, typography scale, no-tofu) — route all recurring menu/text-drift issues here rather than fixing them ad hoc.
 - `unity-debug-profiler`: blank scene / null refs / compile errors, domain-reload recovery, profiler, draw calls, memory, mobile thermal/perf.
 - `unity-qa-release`: Play Mode + EditMode tests, device-resolution checks, iOS build pipeline, App Store / privacy-manifest readiness, release risks.
+- `unity-game-economy`: design the economy & meta-progression (currencies, sources/sinks, progression pacing, reward schedules, IAP catalog) that make the game retain and monetize — distinct from monetization (SDK wiring) and analytics (measurement).
+- `unity-localization`: globally-localizable text/assets via the Unity Localization package (String/Asset Tables, Smart Strings, per-script fonts/RTL, pseudoloc, localized store metadata). Externalize strings early.
+- `unity-aso-growth`: App Store Optimization + growth (listing, icon/screenshots/preview, Product Page A/B, soft-launch UA, SKAdNetwork measurement, ratings prompts). Retention before acquisition.
+- `unity-project-setup`: project foundation — source control (.gitignore/LFS/meta files), folder + asmdef architecture, package management, versioning, secrets-per-env, CI/CD basics.
 
 If a sibling file cannot be loaded, record the path/reason and use this director's routing as the fallback for that phase.
 

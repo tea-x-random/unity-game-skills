@@ -1,7 +1,7 @@
 # Unity Game Skills
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-18-blue.svg)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-22-blue.svg)](#skill-catalog)
 [![Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2.svg)](https://docs.claude.com/en/docs/claude-code)
 
 A collection of **[Claude Agent Skills](https://docs.claude.com/en/docs/claude-code/skills)** for building **casual iOS games in Unity 6** with Claude (Claude Code, the desktop app, or the Agent SDK). The skills drive a live Unity Editor through [MCP for Unity](https://github.com/CoplayDev/unity-mcp), generate 2D/3D/audio assets from text prompts, and carry battle-tested checklists for graphics, UI, gameplay, monetization, QA, and App Store release.
@@ -63,6 +63,18 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 | **unity-mcp-bridge** | The execution layer beneath everything else. Wraps [MCP for Unity](https://github.com/CoplayDev/unity-mcp) to create scenes, GameObjects, components, prefabs, materials and scripts; run Play Mode / tests; read the console; drive headless iOS builds. Covers setup and the domain-reload reconnect dance. |
 | **unity-mcp-skill** | Tool/resource reference and workflow patterns for the MCP for Unity server. Complements `unity-mcp-bridge` with schemas and best practices. |
 
+### Foundations
+
+| Skill | What it does |
+|-------|--------------|
+| **unity-project-setup** | Project foundation for a team — Unity `.gitignore` + Git LFS + meta-file/serialization discipline, `Assets/<Game>/` structure, asmdef architecture (engine-free Core/Game/Editor/Tests), package management, versioning, secrets-per-environment, and CI/CD basics. |
+
+### Design & systems
+
+| Skill | What it does |
+|-------|--------------|
+| **unity-game-economy** | Designs the economy & meta-progression that make a casual game retain and monetize — soft/hard currencies, balanced sources & sinks, progression pacing, reward schedules, session design, and IAP-catalog/pricing design. Complements `unity-monetization` (wiring) and `unity-analytics-liveops` (measuring). |
+
 ### Build the game
 
 | Skill | What it does |
@@ -92,6 +104,13 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 | **unity-analytics-liveops** | Analytics & liveops: D1/D7/D30 retention and ARPDAU funnels, remote config + A/B testing, crash/analytics SDKs (Unity Gaming Services, GameAnalytics, Firebase), soft-launch measurement, and iOS ATT/SKAdNetwork/AdAttributionKit + privacy-manifest coordination — the levers that turn a playable game into a retentive, monetizable one. |
 | **unity-qa-release** | Play Mode / EditMode tests, device-resolution & safe-area checks, iOS build (IL2CPP/ASTC/Xcode), privacy manifest, TestFlight, fastlane signing, and release-risk reports. |
 | **unity-ios-secure-backend** | Anti-cheat leaderboards: Apple Game Center identity verification + App Attest, verified server-side by a Node/NestJS backend. |
+
+### Global & growth
+
+| Skill | What it does |
+|-------|--------------|
+| **unity-localization** | Ship a globally-localizable game with the Unity Localization package — String/Asset Tables, locale selection, Smart Strings (plurals/variables), per-script fonts + RTL, pseudolocalization, text-expansion layout, and localized App Store metadata. |
+| **unity-aso-growth** | App Store Optimization & growth — icon/title/keywords/screenshots/preview-video, Apple Product Page A/B testing, creatives & soft-launch UA, SKAdNetwork/AdAttributionKit measurement, and ratings prompts. Retention before acquisition. |
 
 ---
 
@@ -173,7 +192,7 @@ done
 
 Start Claude Code and ask: *"What Unity skills do you have?"* — it should list the `unity-*` skills. Or run `/help` and look for the skills section.
 
-You don't need all 18. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
+You don't need all 22. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
 ---
 
@@ -293,7 +312,11 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-monetization/
     ├── unity-analytics-liveops/
     ├── unity-qa-release/
-    └── unity-ios-secure-backend/
+    ├── unity-ios-secure-backend/
+    ├── unity-project-setup/
+    ├── unity-game-economy/
+    ├── unity-localization/
+    └── unity-aso-growth/
 ```
 
 ---

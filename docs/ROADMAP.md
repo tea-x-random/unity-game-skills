@@ -30,13 +30,22 @@ This file captures the research that shaped the skill set and the prioritized im
 - **Updated `unity-game-director`** — the asset gate is now a **Visual Quality Gate** (real art is the default for every primary surface; procedural is fallback-only; amateur-look auto-fails), with routing to the new skills and a stronger screenshot acceptance check.
 - **Updated `unity-graphics`, `unity-image-generator`, `unity-3d-generator`** — procedural reframed as fallback (not "premium"); AAA prompt engineering + environment/terrain texture generation + a refine loop added to the generators.
 
+## Shipped from the studio-POV audit
+
+A studio-point-of-view audit (what a real casual-game team needs beyond the playable slice) shipped four new skills:
+
+- **New `unity-project-setup`** — project foundation for a team: Unity `.gitignore` + Git LFS + meta-file/serialization discipline, `Assets/<Game>/` structure, asmdef architecture (engine-free Core/Game/Editor/Tests), package management, versioning, secrets-per-environment, and CI/CD basics.
+- **New `unity-game-economy`** — economy & meta-progression design: soft/hard currencies, balanced sources & sinks, progression pacing, reward schedules, session design, and IAP-catalog/pricing design. Complements `unity-monetization` (wiring) and `unity-analytics-liveops` (measuring).
+- **New `unity-localization`** — globally-localizable game via the Unity Localization package: String/Asset Tables, locale selection, Smart Strings (plurals/variables), per-script fonts + RTL, pseudolocalization, text-expansion layout, and localized App Store metadata.
+- **New `unity-aso-growth`** — App Store Optimization & growth (resolves the ASO/store-listing recommendation below): icon/title/keywords/screenshots/preview-video, Apple Product Page A/B testing, creatives & soft-launch UA, SKAdNetwork/AdAttributionKit measurement, and ratings prompts.
+
 ## Open recommendations (prioritized)
 
-1. **ASO / store-listing skill or checklist** — icon/screenshot/title/keyword optimization and A/B (store-side), and a soft-launch → global checklist. Currently only lightly implied; could be a `references/aso.md` under `unity-qa-release` or a dedicated skill.
-2. **Onboarding / first-session "find-the-fun" gate** — make first-session design and its instrumentation a first-class step in `unity-gameplay-systems` + `unity-game-director` (retention's top lever).
-3. **Concrete SDK integration recipes** — per-provider wiring notes (Unity Gaming Services, GameAnalytics, Firebase Crashlytics, AppsFlyer/Adjust/Tenjin) in `unity-analytics-liveops/references/`.
-4. **Live-ops content cadence** — events/seasons/offers patterns for retention beyond D30.
-5. **Audit, don't infer** — validate each existing skill's depth against these levers (e.g. confirm `unity-monetization` covers ARPDAU-based tuning; confirm `unity-qa-release` covers privacy-manifest entries for analytics SDKs).
+1. ~~**ASO / store-listing skill or checklist**~~ — **shipped as `unity-aso-growth`** (listing optimization, Product Page A/B, soft-launch UA, SKAdNetwork measurement, ratings prompts).
+2. **Save / persistence & cloud-save patterns** — local save (atomic writes, schema migration, corruption recovery) and cloud-save/sync; fold into `unity-gameplay-systems` or `unity-project-setup`.
+3. **Accessibility** — colorblind-safe palettes, dynamic text size, reduce-motion, and audio cues; fold into `unity-ui-designer`.
+4. **Onboarding / first-session "find-the-fun" gate** — make first-session design and its instrumentation a first-class step in `unity-gameplay-systems` + `unity-game-director` (retention's top lever).
+5. **Concrete SDK integration recipes** — per-provider analytics wiring notes (Unity Gaming Services, GameAnalytics, Firebase Crashlytics, AppsFlyer/Adjust/Tenjin) in `unity-analytics-liveops/references/`.
 
 ## Sources
 

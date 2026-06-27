@@ -31,7 +31,7 @@ Enumerate the required clips per asset BEFORE generating — a single static pos
 | **Boss** | the enemy set + telegraphed `attack` tells (clear anticipation), `phase`/enrage |
 | **Collectible / pickup** | `idle` bob/spin (loop), `collect` pop (often a tween + VFX) |
 | **Projectile / VFX** | `travel` (loop or tween), `impact` |
-| **UI** | button `press`, reward/`win`, screen transitions (see `unity-game-ui-designer`/`unity-ui-designer`) |
+| **UI** | button `press`, reward/`win`, screen transitions (see `unity-ui-designer`) |
 
 For a tower-defense **archer** specifically: `idle` (subtle breathing) → `aim` (nock + draw, can hold) → `fire` (loose + recoil) with an **Animation Event on the bowstring-release frame** that calls the shooting code to spawn the arrow. That sync is what makes it read as a real game.
 
