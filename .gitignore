@@ -1,0 +1,26 @@
+# Secrets / environment
+.env
+.env.local
+*.key
+*.pem
+
+# Python virtual envs used by the asset scripts
+.artvenv/
+.venv/
+venv/
+__pycache__/
+*.pyc
+
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Local Claude settings (keep skills/ tracked, ignore machine-local config)
+.claude/settings.local.json
+
+# Generated asset output (if you run the scripts from inside this repo)
+/out/
+/tmp/
