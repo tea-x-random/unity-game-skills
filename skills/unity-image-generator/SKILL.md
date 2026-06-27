@@ -63,7 +63,7 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 - **Backgrounds / parallax layers:** request seamless or full-bleed layers sized to portrait phone aspect (e.g. 1080×1920 framing).
 - **UI:** buttons, panels, frames, progress bars, currency/HUD icons, settings glyphs — flat, high-contrast, readable at small size, transparent background. Keep a consistent icon family.
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
-- **Texture/material references and image-to-3D concepts:** front/side/back T-pose sheets, tiling material swatches — these feed `unity-3d-generator`.
+- **Texture/material references and image-to-3D concepts:** front/side/back T-pose sheets, tiling material swatches — these feed `unity-3d-generator`. **When the concept will be rigged/animated via Tripo, generate a clean full-body T-pose (or A-pose)** — arms away from the torso, legs apart, no props crossing the body — because auto-rigging fails on action poses; generate the action (e.g. a bow-draw) later as animation clips, not in the static concept (see `../unity-3d-generator/SKILL.md` → "Riggable characters need a clean full-body T-pose").
 
 ## AAA prompt engineering (avoid flat/MS-Paint output)
 

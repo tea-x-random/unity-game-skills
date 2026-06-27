@@ -54,7 +54,7 @@ See `references/animation-recipes.md` for the clip-build + Animation Event code.
 
 ## Track B — 3D skeletal animation
 
-1. **Rig + animate via Tripo** (`unity-3d-generator`): auto-rig the model, then generate/retarget the needed cycles (idle, walk, attack, …). Prefer rigging a clean game-ready mesh (see `unity-art-direction` budgets).
+1. **Rig + animate via Tripo** (`unity-3d-generator`): auto-rig the model, then generate/retarget the needed cycles (idle, walk, attack, …). Prefer rigging a clean game-ready mesh (see `unity-art-direction` budgets). Rigging requires the source model be generated from a clean **T-pose/A-pose** concept — action poses break the rig (see `unity-3d-generator` → "Riggable characters need a clean full-body T-pose"); author the action (draw/attack) as animation clips here, not baked into the rest pose.
 2. **Import the rig** as Humanoid (retargetable, reuse a shared controller across characters) or Generic (non-humanoid creatures/turrets); configure the Avatar.
 3. **Animator Controller** with state machine + blend trees (e.g. an idle↔move blend on `Speed`); reuse one controller across same-rig characters.
 4. **Animation Events** on attack/fire clips to call gameplay (deal damage / spawn projectile) on the contact/release frame.

@@ -50,6 +50,14 @@ python3 ~/.claude/skills/unity-3d-generator/scripts/unity_3d_asset.py character-
 
 Postprocess (texture / rig / animate / convert / stylize), rigging reliability rules (T/A-pose, prerigcheck-first, rig version by body plan, never `--animate-in-place`), and creature stance rules are unchanged from the proven pipeline — load `references/api-notes.md` before any postprocess/rig/animation work.
 
+## Riggable characters need a clean full-body T-pose (or A-pose)
+
+**Auto-rigging only works on a clean, full-body, limbs-separated pose.** If you feed image-to-3D a concept in an action pose (an archer mid-draw, arms crossed, a prop held across the body, a ¾ "hero" stance, or a cropped/occluded body), the rig will fail or come out broken — limbs fuse, joints land wrong, animation retargets garble. This is the single most common rig failure.
+
+**The rule:** for any character that will be rigged/animated, the image-to-3D input must be a **T-pose** (arms straight out horizontally) or **A-pose** (arms down ~45°), **full body in frame**, **legs slightly apart**, **arms clearly away from the torso**, neutral/symmetrical, **no props or weapons occluding the limbs**, plain background. Generate that rigging-ready concept *first*, rig from it, *then* animate the action cycles (the bow-draw, the attack) as animation clips — never bake the action into the static mesh pose.
+
+**Workflow:** generate a clean T-pose concept (`unity-image-generator`, or a T-pose turnaround from `unity-asset-designer`) → `image` to 3D → `prerigcheck` → rig → animate (preset/retarget cycles). If a rig fails, suspect the input pose first, regenerate a cleaner T-pose, and re-run — don't fight the rigger. Hold the character's *style/identity* constant (same prompt tokens) but swap the pose to neutral. (Props the character uses — bow, sword — are usually modeled/attached separately or kept to the side in the concept, not crossed over the body.)
+
 ## Use Tripo for 2D games too — pre-rendered 3D → sprites
 
 **Tripo is not only for 3D games.** Many premium-looking "2D" mobile games are actually **pre-rendered 3D**: generate a model with Tripo, then render it from the game camera to produce 2D sprites. For a 2D casual game this is often the *higher-quality* path than generating sprites directly, and it is under-used — reach for it whenever an asset needs multiple angles, animation frames, or a consistent premium finish.
