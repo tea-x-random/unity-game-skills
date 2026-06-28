@@ -4,6 +4,8 @@ One-line prompts produce one-line art. This library gives a reusable **prompt te
 
 > Replace every `[BRACKET]` with your project's own art-direction tokens (from the style guide). Keep the *structure*; vary the *tokens*.
 
+> **Style comes from the project, never from this library.** The tokens — including fidelity and finish — are the user's/style-guide's. "AAA" here means *intentional and cohesive*, **not** "high-detail." A flat, minimal, muted look done cohesively is premium; this library must serve it as readily as a glossy one. Do not let the examples below push a target toward more rendering than it wants.
+
 > **Source rule:** motion / animated / multi-angle assets → Tripo (rig + animate; for 2D, pre-render the cycles to sprite frames — see `unity-3d-generator` pre-render + `../../unity-animation/SKILL.md`). Gemini → static art, textures, UI, and the reference images that condition Tripo. Gemini frame-by-frame drifts and is a fallback only when the Tripo key is `MISSING`.
 
 ## The prompt template (anatomy)
@@ -17,17 +19,28 @@ A production-quality prompt names all of these, in roughly this order:
 [FORM/SHAPE LANGUAGE — round/soft vs sharp; proportions; silhouette readability]
 [MATERIAL & COLOR — palette tokens + surface (matte/glossy/metal/fabric/foliage)]
 [LIGHTING — direction + quality, e.g. "soft key light from top-left, gentle ambient, soft contact shadow"]
-[RENDER FIDELITY — e.g. "high-detail, clean edges, subtle gradient shading, ambient occlusion, polished game-ready asset"]
+[RENDER FIDELITY — TARGET-RELATIVE, from the style guide. A spectrum, not a ladder: "flat single-tone
+  cel, no gradients" is as valid a target as "high-detail, gradient shading, ambient occlusion, polished".
+  Name the target's point on it; do NOT assume high-detail.]
 [OUTPUT SPEC — transparent background OR seamless tiling; resolution framing; single centered subject; no text]
-[NEGATIVES — what to avoid]
+[NEGATIVES — TARGET-RELATIVE; see below]
 ```
 
-### Universal negative prompt (append to most prompts)
-```
-NOT: flat single-color fill, MS-Paint look, programmer art, hard jagged edges, muddy colors,
-low detail, blurry, watermark, text/letters, drop-shadow box, off-model, inconsistent lighting,
-cluttered, baked-in UI.
-```
+### Negative prompt — build it from your target, it is NOT universal
+The model's prior is to **over-render** (saturated, glossy, gradient-shaded, heavy outlines, busy). Your negatives are the axes where your target *differs* from that prior, so they **depend on the target style**:
+
+- **High-fidelity / painterly target:**
+  ```
+  NOT: flat single-color fill, MS-Paint look, programmer art, hard jagged edges, muddy colors,
+  low detail, blurry, watermark, text, drop-shadow box, off-model, inconsistent lighting, cluttered.
+  ```
+- **Flat / minimal / muted target** (cozy-vector, flat-design puzzle — a *premium* look, not amateur):
+  ```
+  NOT: thick outline, black outline, glossy, gradient, painterly, volumetric shading, saturated,
+  high-contrast, busy/over-detailed, drop shadow, photo, 3D render, watermark, text.
+  ```
+
+Never paste a fixed "universal" list — `NOT: flat single-color fill` will actively sabotage a flat target.
 
 ## The refine loop (don't accept the first generation)
 

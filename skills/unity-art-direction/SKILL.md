@@ -30,7 +30,9 @@ Before the first production asset, write and approve `Assets/GameArt/_ArtDirecti
 
 ## Choose a style preset
 
-Pick **exactly one** primary `style_id` (optionally one named secondary influence) from the 12-preset library in `references/style-presets.md`, which lists each preset's reference language, best camera, visual grammar, good-fit genres, and per-style generation do/don'ts. For a typical casual iOS project, start with one of:
+**The style is the user's choice, not the skill's.** Derive `style_id` from the user's stated aesthetic or a reference they provide — if they gave a reference image/game, **measure its DNA** (line weight, flat-vs-rendered shading, sampled palette hexes, contrast, detail density, focal hierarchy) and pick the preset that fits, recording the measured tokens in the spec. If the user gave **no** direction, present 2–3 candidate presets and **ask** — don't silently default. The preset is a starting scaffold to fill with the user's tokens, never a house style imposed on them.
+
+Pick **exactly one** primary `style_id` (optionally one named secondary influence) from the 12-preset library in `references/style-presets.md`, which lists each preset's reference language, best camera, visual grammar, good-fit genres, and per-style generation do/don'ts. Candidates for a typical casual iOS project (illustrative, not a ranking — flat is as valid as rendered):
 - **`cozy_toy_diorama`** — puzzles, idle, social, broadly-appealing (rounded forms, matte materials, soft bevels).
 - **`heroic_handpainted_fantasy`** — an approachable "premium game" feel with strong collectible/UI potential.
 - **`clean_graphic_casual`** — premium mobile puzzle/word/match (near-flat materials, 2–4 dominant colors, maximum readability).

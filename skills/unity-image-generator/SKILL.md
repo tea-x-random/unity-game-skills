@@ -65,21 +65,59 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
 - **Texture/material references and image-to-3D concepts:** front/side/back T-pose sheets, tiling material swatches — these feed `unity-3d-generator`. **When the concept will be rigged/animated via Tripo, generate a clean full-body T-pose (or A-pose)** — arms away from the torso, legs apart, no props crossing the body — because auto-rigging fails on action poses; generate the action (e.g. a bow-draw) later as animation clips, not in the static concept (see `../unity-3d-generator/SKILL.md` → "Riggable characters need a clean full-body T-pose").
 
-## AAA prompt engineering (avoid flat/MS-Paint output)
+## Style is the user's, never the skill's (READ FIRST)
 
-One-line prompts produce one-line art. A production prompt names, in order: **subject**; **view/framing** (top-down, 3/4, side, centered); **art style + 1–2 named touchstones**; **shape language** (chunky, rounded, angular); **material & color** with palette tokens (hex or named); **lighting** (direction + quality — e.g. soft key from upper-left, warm rim); **render fidelity** (high-detail, clean edges, subtle shading, baked ambient occlusion); **output spec** (transparent background OR seamless tiling, single subject, no text/UI); and a **negative prompt** (`NOT: flat single-color fill, MS-Paint, programmer art, jagged edges, muddy, blurry, watermark, text`).
+This skill is a **neutral pipeline**. Every style token — line weight, outline color, palette, shading model, fidelity, finish — comes from the **user's stated aesthetic** or a **user-provided reference**. The skill must **never inject a house style**: no default "cozy", "storybook", "cute", "AAA", "painterly", "thick ink", "high-detail". There is **no such thing as a default look** here, and **flat/minimal is exactly as valid a target as high-detail rendered** — neither is "better".
 
-For the full template, full negative-prompt list, and per-genre exemplar prompts, see `../unity-aaa-graphics/references/prompt-library.md` — keep prompts here concise; the library has the depth.
+- **If the user gave an aesthetic, transmit it faithfully.** Build the prompt from THEIR words, not your priors.
+- **If the user gave a reference, MEASURE it (don't vibe it)** — see "Match a reference" below.
+- **If neither was given, ASK** for one (a sentence of direction or one example image) before generating. A guessed style is the #1 cause of "looks nothing like what I wanted" churn — and the failure is silent, because self-graded art always "looks fine."
+
+> Real failure this codifies: a flat, muted, thin-line puzzle game (Pup Champs) was generated from injected adjectives ("cozy storybook thick-ink, warm palette"). Result: gorgeous but *completely wrong* — heavy black ink, saturated, painterly, dominant background, invisible grid. The skill, not the user, had supplied the style.
+
+## Prompt engineering (match the TARGET fidelity — high or flat)
+
+One-line prompts produce one-line art. A production prompt names, in order: **subject**; **view/framing** (top-down, 3/4, side, centered); **art style** (from the brief/reference — name touchstones only if the user did); **shape language** (chunky, rounded, angular); **palette** with explicit tokens (hex or named, sampled from the reference); **shading model** *as the target dictates* — flat single-tone, cel, soft-gradient, or fully rendered with AO — these are CHOICES, not a ladder; **fidelity/detail density** *as the target dictates* (minimal-and-clean is a legitimate target, not a failure); **output spec** (transparent OR seamless tiling, single subject, no text/UI); and a **negative prompt built from the axes where the target differs from the generator's default** (next paragraph).
+
+**Counter-steer the generator's defaults — but ONLY on the axes where your MEASURED target differs.** Gemini (and most image models) bias toward over-rendering: gradient/glossy shading, busy detail, and sometimes muddy or washed color. Negate an axis **only when your measured target sits opposite the model's drift on THAT axis** — never paste a blanket list, and never negate an axis your reference actually has. Worked examples on the same flat reference:
+- Its **fill** is flat but its **outline is bold** and **palette saturated** and pieces have **drop shadows** → negate `NOT gradient shading, NOT glossy, NOT busy` (to hold flatness/cleanness) but DO NOT negate outline, saturation, or shadow — prompt FOR a "bold dark outline", "saturated", "soft drop shadow" instead. (Negating `NOT saturated`/`NOT drop shadow` here — as a naive "it's flat so make everything light" would — actively breaks the match.)
+- A high-detail painterly target → steer the other way: `NOT flat single-color fill, NOT MS-Paint, NOT jagged edges`.
+
+The list is built **per measured axis**, every time. (The old fixed `NOT: flat single-color fill` sabotaged a flat target; a naive `NOT saturated, NOT drop shadow` sabotaged the *corrected* attempt at the SAME target. Both came from a blanket list instead of per-axis measurement.)
+
+For template scaffolding and per-genre exemplars see `../unity-aaa-graphics/references/prompt-library.md` — but treat its high-fidelity examples as ONE point on the spectrum, and rewrite its negatives to your target.
+
+## Match a reference (measure INDEPENDENT axes — never slide one "heavy/light" knob)
+
+The biggest, most expensive mistake here: collapsing a reference into a single gestalt vibe ("heavy storybook" / "soft flat-minimal") and dialing that one knob. **Style is multi-dimensional, and the axes are INDEPENDENT.** A reference can be *flat-filled* **and** *bold-outlined* **and** *saturated* **and** *drop-shadowed* all at once — sliding one knob can never reach that mix. "Flat" describes ONLY the fill; it implies nothing about outline weight, color, shadows, or saturation. Two real misses on the SAME game (Pup Champs): pass 1 over-heavy (thick black ink, painterly), pass 2 over-corrected to light on *every* axis (thin outline, muted, no shadow, no grid) — when the truth was flat-fill + **bold** dark outline + **saturated** palette + **drop shadows** + **visible grid**.
+
+When given a reference image (or a named shipped game), do NOT describe it from memory. **Open it, zoom in (crop the key pieces 3×), and SAMPLE PIXELS.** Measure each axis SEPARATELY and write each as its own explicit token. Do not let any axis inherit a value from your overall impression:
+
+1. **Fill / shading:** flat single-tone · cel (1 shadow) · soft-gradient · fully-rendered. (Many cozy mobile games are **flat** — measure, don't assume rendered.)
+2. **Outline weight:** none · thin · **bold**. Measure it in px relative to the asset, on a zoomed crop. This is independent of fill.
+3. **Outline color:** true-black · dark-tinted (e.g. dark brown) · colored.
+4. **Character treatment:** plain · **sticker-halo** (a thick white/cream border around characters — a very common mobile signature; easy to miss, defines the look).
+5. **Grounding:** none · **drop shadow** · contact AO. (If the reference has soft shadows under every piece, you MUST add them — do NOT negative-prompt "drop shadow" away.)
+6. **Saturation & contrast:** sample 4–7 actual hexes off the pixels. Muted-grey vs **saturated** is a measurement, not a feeling — getting this from memory is how a saturated reference becomes a washed-out copy.
+7. **Detail density:** minimal/iconic vs busy.
+8. **Perspective/framing + focal hierarchy:** in a board/puzzle game **the grid/board is the hero** and the background is subordinate (generate the bg low-contrast so it recedes). If the reference shows a **grid**, the grid is a first-class element — see the engine note below.
+
+Reuse ONE measured token-set across the whole asset family. **Then validate PER-AXIS against the reference, not gestalt:** chroma-key the pieces, composite onto the bg in the reference's own layout, place it **side-by-side with the actual reference**, and check EACH axis explicitly — "is my outline as bold? is my red as saturated? do my pieces have the shadow? the halo? the grid?" A gestalt "looks close" is exactly how both wrong passes shipped. (This out-of-engine check is also immune to a flaky MCP bridge.)
+
+> **What you mock must be what the ENGINE renders.** A Pup Champs miss: the grid was drawn in the PIL validation mock but never built into the Unity scene, so the "validated" layout didn't exist in-game. If a feature appears in your validation composite (grid lines, shadows, halos), it must be produced by the scene builder / shaders too — otherwise the mock is validating a lie. Either build it in-engine or don't put it in the mock.
+
+## Transparency: Gemini fakes it — chroma-key instead
+
+Asking Gemini for a "transparent background" often yields a painted **checkerboard** (fully opaque) or a colored fill, not real alpha. Reliable path: generate the subject **alone on a solid chroma background** — magenta `RGB(255,0,255)` (use cyan if the subject itself is pink/red/magenta) — then key it out: sample the corner color, drop pixels within a distance threshold, cut alpha, and autocrop. (A reusable keyer pattern lives in the field notes / scratch scripts.)
 
 ## Environment & terrain textures (most-missed assets)
 
-Top-down and side games need **real textured ground and paths, not flat color fills** — this is what removes most of the "amateur" look in tower-defense / top-down maps. Generate **seamlessly tiling** ground / path / tileset textures, e.g.:
+Top-down and side games need **real ground and paths that read as a surface, not a single flat fill** — this removes most of the "amateur" look in tower-defense / top-down maps. Generate **seamlessly tiling** ground / path / tileset textures. The `<STYLE>` and `<PALETTE>` slots below are filled **from the user's brief / measured reference** — the example uses a painterly fill only to show the shape; swap it for whatever the target style is (flat-cel, pixel, painterly, …):
 
 ```
-seamless tiling stylized grass ground texture, top-down, hand-painted painterly style,
-soft varied green palette (#6Fae5a / #4f8a3e), subtle dirt patches and clumps, even soft
-lighting, high-detail, clean edges, no seams, no subject, no text — NOT: flat single-color
-fill, MS-Paint, harsh tiling seams
+seamless tiling <STYLE> grass ground texture, top-down, <PALETTE e.g. #6Fae5a / #4f8a3e>,
+subtle variation and clumps, even soft lighting, clean edges, no seams, no subject, no text
+— <NEG built for the target style>
 ```
 
 Import tiling textures with `wrapMode = TextureWrapMode.Repeat` and **mipmaps ON** for material/3D use (the opposite of UI sprites). Apply to a material's albedo and set tiling so the pattern repeats across the surface.
@@ -126,3 +164,4 @@ Then:
 
 - **Policy: Motion → Tripo, static → Gemini.** Anything that moves or needs multiple poses/turnaround consistency goes through Tripo (rig + animate; pre-render to sprites for 2D) with Gemini supplying the reference images that condition it. Gemini is for static art, textures, grounds, backgrounds, UI/icons, and concept/reference images; its frame-by-frame animation drifts and is a fallback only when `TRIPO_API_KEY` is missing/quota-blocked.
 - Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted non-Latin text needs a matching TMP font (default LiberationSans has no glyphs for many scripts) — fall back to a supported script until imported.
+- **Style-neutrality + per-axis measurement is the law here (learned the hard way, TWICE on one game).** Pass 1: a flat puzzle game generated from *injected* adjectives ("cozy storybook thick-ink, warm") → beautiful but wrong (heavy ink, painterly, dominant bg). Pass 2 *over-corrected* by sliding every axis to "light" (thin outline, muted, no shadow, no grid) → still wrong. Truth (measured): flat fill + **bold** dark-brown outline + white **sticker-halo** + **drop shadows** + **saturated** palette + **visible grid**. The lesson: (1) all style tokens come from the user/reference, never the skill's priors; (2) **style is multi-axis and the axes are INDEPENDENT — measure each separately by zooming + sampling pixels; never collapse to one "heavy/light" knob** ("flat" constrains only the fill); (3) counter-steer the model only on axes where the measured target differs; (4) validate **per-axis** side-by-side with the actual reference; (5) what the mock shows, the engine must render (the grid was mocked but never built). See "Match a reference" above.

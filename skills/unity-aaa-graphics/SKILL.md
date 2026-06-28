@@ -25,10 +25,12 @@ Diagnose against this list — each one is a fixable cause:
 
 If two or more apply, the scene fails the bar — run the full pipeline below.
 
+> **"Flat" here means *placeholder*, not a style.** The failure above is unintentional flatness — solid-color *fills standing in for surfaces*, primitives standing in for art, and **no cohesion**. It is NOT a verdict on flat/minimal *art direction*. A cohesive flat-design or minimal-vector look (think a polished cozy puzzle game) is **premium**, and this skill must elevate it, not "fix" it into gloss. The enemy is *placeholder + incoherent + unintentional*, never "low gradient count." Likewise "AAA" in this skill = *intentional, cohesive, on-model*, not "high-detail." Before diagnosing a scene as amateur, ask whether the flatness is the **intended target**; if so, the work is to make it cohesive and well-composed at that fidelity, not to add rendering the user never asked for.
+
 ## Pipeline (art-first, heavy on generation)
 
 ### 1. Art direction first (load `unity-asset-designer`)
-Pin a concrete north-star (reference style + 4–7 color palette with roles + light direction + finish + mood/anti-mood) BEFORE generating anything, and build the style-guide / reference sheets so every asset is on-model. See `unity-game-director` Step 2.6 and `unity-asset-designer`. Without this, generated assets drift and you get the one-hero-mismatch problem.
+Pin a concrete north-star (reference style + 4–7 color palette with roles + line weight + shading model + fidelity + finish + mood/anti-mood) BEFORE generating anything, and build the style-guide / reference sheets so every asset is on-model. **The north-star comes from the user (their stated aesthetic or a reference they provide), never from a house default — and the fidelity/finish are whatever THEY want, flat or rendered.** If the user gave no direction, ASK before generating. See `unity-game-director` Step 2.6 and `unity-asset-designer`. Without this, generated assets drift and you get the one-hero-mismatch problem — or, worse, a confidently-wrong style the skill invented.
 
 ### 2. Enumerate EVERY visible surface, then decide source per surface (mandatory)
 List the full visible surface set for the genre (see genre kits in `references/prompt-library.md`), and for **each** make an explicit generate-vs-procedural decision. **Default to generate.** Procedural only if: key `MISSING`/quota-blocked (show the probe output), or a genuinely low-value repeated element better done by atlas/instancing.
@@ -58,20 +60,20 @@ Short, additive particle/feedback bursts (place, hit, wave-clear, win) lift perc
 
 ## Visual scorecard gate
 
-Capture a real device-resolution screenshot via MCP and score 1–10 on each axis. **Any axis ≤ 4 is an automatic fail → fix and re-shoot.** Target an ~8/10 average before "done."
+Capture a real device-resolution screenshot via MCP and score 1–10 on each axis. **Any axis ≤ 4 is an automatic fail → fix and re-shoot.** Target an ~8/10 average before "done." **Every axis is judged against the TARGET style, not against "more rendering."** For a flat/minimal target, "passing" means *intentional and cohesive at that fidelity* — gradients and AO are not required and may be wrong.
 
 | Axis | Passing looks like |
 |------|--------------------|
-| **Surfaces textured** | Ground/path/regions are real textured art, NOT flat fills |
-| **Asset cohesion** | All assets share palette, light direction, finish — no one-hero mismatch |
-| **Lighting & depth** | Real lighting/shadow/gradient; the scene reads 3D/layered, not uniformly flat |
-| **Composition** | Clear focal point, intentional framing, negative space filled with scatter/detail |
+| **Surfaces intentional** | Ground/path/regions are deliberate, on-style art — textured if the style is textured, clean cohesive flat regions if the style is flat — NOT *placeholder* fills |
+| **Asset cohesion** | All assets share palette, line weight, shading model, finish — no one-hero mismatch |
+| **Depth & hierarchy** | The scene has clear layering and a focal hierarchy by whatever means the style uses — lighting/shadow/gradient for rendered styles, or value/overlap/scale/framing for flat styles — never an accidental uniform mush |
+| **Composition** | Clear focal point, intentional framing, negative space used with intent (filled, or deliberately calm) |
 | **Finish consistency** | Every element flat *or* every element rendered — never mixed |
-| **Readability** | Gameplay-critical elements (path, towers, enemies) pop against the ground |
+| **Readability** | Gameplay-critical elements (path, towers, enemies, the board/grid) pop against their ground |
 | **HUD/UI quality** | Designed readouts/buttons, on-theme — not default labels on flat bars |
 | **Animation** | Assets that act are animated (idle/move/attack/hit/death as needed); actions fire gameplay on the correct frame — nothing static where motion is expected |
 
-Auto-fail anti-patterns (ship-blockers): flat solid-color ground; procedural blobs for primary surfaces; one generated asset amid untextured everything-else; hard-oval vignette as the only "lighting"; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
+Auto-fail anti-patterns (ship-blockers): *placeholder* solid-color ground used because no art was made (≠ an intentional flat-design fill); procedural blobs for primary surfaces; one generated asset amid untextured everything-else; hard-oval vignette as the only "lighting" on a style that wanted real lighting; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
 
 ## Where this sits
 
@@ -89,4 +91,5 @@ Auto-fail anti-patterns (ship-blockers): flat solid-color ground; procedural blo
 - Environment/terrain is the most-overlooked surface: a tiling textured ground + a textured path instantly removes 80% of the amateur read in top-down/TD games.
 - One-line prompts produce one-line art. The prompt template (subject + style + material + lighting + render fidelity + framing + negatives) is the difference between placeholder and production — see `references/prompt-library.md`.
 - Procedural-fallback guidance is for *blocked* pipelines only; never present it as "premium." If a key is `MISSING`, say so and flag bespoke art as the upgrade rather than calling the placeholder look done.
-- Generated sprites still look flat until the scene is **lit and composed** — always finish with `unity-graphics` (lighting + backdrop + post), not raw sprites on a solid color.
+- Generated sprites still look flat until the scene is **lit and composed** — always finish with `unity-graphics` (lighting + backdrop + post), not raw sprites on a solid color. *Caveat:* this is for rendered targets — a flat-design target is finished by clean composition + cohesion, not by adding lighting it never wanted.
+- **Don't confuse "flat placeholder" with "flat style," and never invent the style.** A flat/minimal/muted look (cozy-vector puzzle, flat-design) is premium when cohesive; this skill's job there is cohesion + composition at the target fidelity, not adding gloss/AO. The amateur read comes from *placeholder fills + procedural primitives + incoherence*, not from low gradient count. All fidelity/finish decisions come from the user's brief or a measured reference — if absent, ask. (Real miss: a flat thin-line puzzle game was "upgraded" toward heavy-ink painterly gloss because the pipeline equated flat with amateur.)
