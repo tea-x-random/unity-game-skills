@@ -231,6 +231,33 @@ subtle variation and clumps, even soft lighting, clean edges, no seams, no subje
 
 Import tiling textures with `wrapMode = TextureWrapMode.Repeat` and **mipmaps ON** for material/3D use (the opposite of UI sprites). Apply to a material's albedo and set tiling so the pattern repeats across the surface.
 
+
+## Candidate batches: generate best-of-N, not first-pass canon
+
+For production assets, do not accept the first plausible image. Generate **3–6 candidates** at 1K from the same shared `art-spec.yaml` + `composition.yaml` + family brief, run `validate_sprite.py` and `critique_image.py` on each, then select with:
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/select_best_candidate.py \
+  --candidates Assets/Art/QA/<asset_id>.candidates.json \
+  --json-report Assets/Art/QA/<asset_id>.best.json
+```
+
+Only the selected candidate gets refined to 2K and promoted into `unity-asset-pipeline`. This “best-of-N + keep-best” pattern is adapted from image-extension workflows and prevents weak first passes from becoming canon. For the full adapted workflow, read `references/image-extender-findings.md` when doing batch art generation, tilesets, sprite sheets, or outpainted backgrounds.
+
+## Sheets / atlases need engine-safe padding
+
+When generating a family sheet, tile sheet, or sprite sheet, repack it with duplicated edge pixels before import to prevent texture bleeding after filtering/mipmaps/atlas packing:
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/extrude_atlas.py \
+  --input Assets/Art/Source/meadow_tiles_raw.png \
+  --rows 4 --cols 4 --extrude 2 --padding 2 \
+  --output Assets/Art/Source/meadow_tiles_extruded.png \
+  --manifest Assets/Art/Source/meadow_tiles_extruded.json
+```
+
+Slice using the manifest's `atlas_rect` (excluding the extruded border), then record the final `sprite_atlas` / `atlas_group` in the asset contract.
+
 ## Refine loop (regenerate, don't just reroll)
 
 Generate at **1K** first to check composition. If framing/subject is wrong, **rewrite the prompt** (don't just reroll the same one). Once composition is right, refine at **2K** via `--input-image`, reusing **verbatim style tokens** (style name, touchstones, palette) to avoid drift across passes. Use the prompt-library's per-asset rubric to judge each pass. Iterating via `--input-image` also handles recolors, edge cleanup, and variants.

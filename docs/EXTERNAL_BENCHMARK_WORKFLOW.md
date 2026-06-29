@@ -82,3 +82,28 @@ Use these as the first official-source checks in the next benchmark pass:
 - Unity Manual — Presets / Preset Manager: https://docs.unity.cn/2021.1/Documentation/Manual/Presets.html and https://docs.unity.cn/2022.1/Documentation/Manual/class-PresetManager.html
 - Unity Addressables — Groups / labels: https://docs.unity.cn/Packages/com.unity.addressables%401.19/manual/Groups.html and https://learn.unity.com/course/get-started-with-addressables/tutorial/label-addressable-assets
 - Unity Manual — URP 2D Secondary Textures: https://docs.unity.cn/6000.0/Documentation/Manual/urp/SecondaryTextures.html
+
+## Tool-pattern finding: boona13/image-extender
+
+Source: https://github.com/boona13/image-extender
+
+Useful transferable patterns implemented/adapted:
+
+```yaml
+finding_id: image_extender_best_of_n_and_sheet_export
+source_type: tool-pattern
+source_url: https://github.com/boona13/image-extender
+popularity_signal: public open-source image-generation workflow; aligns with repeated AI-art failure modes
+problem: first-pass generated art becomes canon; sheets/tiles are generated without engine-safe padding or consistent brief
+practice: shared scene brief, best-of-N generation, keep-best selection, tile/sprite sheets, template-guided image-to-image, atlas-style export
+pipeline_change: add select_best_candidate.py, extrude_atlas.py, image-extender findings reference, anchor-frame sprite workflow, and contract provenance fields
+skill_targets: [unity-image-generator, unity-asset-pipeline, unity-animation]
+acceptance_gate: selected candidate report exists; rejected candidates are not registered; sheet manifest has extruded frame rects; sprite sheets keep scale/baseline consistent
+status: implemented
+```
+
+Potential future adaptation:
+
+- normalize generated sprite sheets for baseline/scale automatically;
+- generate tile masks/templates before image-to-image painting;
+- outpaint static background plates into parallax layers, then validate them with composition recede rules.

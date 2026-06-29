@@ -79,10 +79,11 @@ Exit code 0 = contract valid and all referenced QA passed; non-zero = rejected (
 ## Apply the contract in Unity + build the prefab
 
 Run inside Unity via `unity-mcp-bridge` `execute_code` or promoted Editor scripts. Key steps live in `references/editor-asset-pipeline.md`:
-1. **ApplyAssetContract** — set TextureImporter/ModelImporter to the contract's PPU, pivot, sprite mode, filter, mipmaps, max size, ASTC, material profile, and optional secondary textures, then validate the realized import matches the contract (the **import validator** — pivot, PPU, sprite mesh mode, compression, max texture size, mipmaps, material/shader assignment).
+1. **ApplyAssetContract** — set TextureImporter/ModelImporter to the contract's PPU, pivot, sprite mode, filter, mipmaps, max size, ASTC, material profile, optional secondary textures, and sheet/atlas slicing data, then validate the realized import matches the contract (the **import validator** — pivot, PPU, sprite mesh mode, compression, max texture size, mipmaps, material/shader assignment).
 2. **GeneratePrefabFromContract** — instantiate, attach the contract's collider + shared material + shadow profile, set pivot, save the prefab to `runtime.prefab`, and stamp the contract path on a small `AssetContractTag` component.
-3. **Atlas/Addressables gates** — if the asset is a sprite, put it in its contract's `sprite_atlas`/`atlas_group`; if the project uses Addressables, assign the contract address/group/labels.
-4. **Import automation** — for real projects, use Unity Import Presets + `AssetPostprocessor` so correct settings are defaults, not manual reminders; validation still verifies the result.
+3. **Best-candidate provenance** — verify `best_candidate_report` points to the selected candidate and that rejected candidates did not enter the registry.
+4. **Atlas/Addressables gates** — if the asset is a sprite, put it in its contract's `sprite_atlas`/`atlas_group`; if the project uses Addressables, assign the contract address/group/labels. For sheets, use `extruded_atlas_manifest` so slicing excludes duplicated edge pixels.
+5. **Import automation** — for real projects, use Unity Import Presets + `AssetPostprocessor` so correct settings are defaults, not manual reminders; validation still verifies the result.
 
 The import validator is a **gate**, not a reminder: if the realized import settings do not match the contract, fail and do not produce a prefab.
 

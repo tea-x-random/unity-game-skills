@@ -43,12 +43,14 @@ Generating per-state frame strips directly with Gemini (the numbered procedure b
 
 **Fallback procedure (Gemini frame strips):**
 
-1. **Generate per-state frame strips** with `unity-image-generator`: request an evenly-spaced horizontal strip of N frames on a transparent background, consistent pivot/scale across frames, one clip per state. Prompt for the motion explicitly (e.g. "8-frame archer firing cycle: nock, draw, hold, loose, recoil — evenly spaced, transparent, consistent character identity and scale"). Reuse verbatim style tokens so frames stay on-model (see `unity-aaa-graphics/references/prompt-library.md`).
+1. **Lock an anchor frame first**, then derive the strip. Generate/approve one neutral anchor pose (same palette/outline/scale as the asset contract), run `validate_sprite.py` + `critique_image.py`, then use it as `--input-image` when asking for the strip. This template-guided flow reduces identity drift compared with a text-only strip prompt.
+2. **Generate per-state frame strips** with `unity-image-generator`: request an evenly-spaced horizontal strip of N frames on a transparent background, consistent pivot/scale/baseline across frames, one clip per state. Prompt for the motion explicitly (e.g. "8-frame archer firing cycle: nock, draw, hold, loose, recoil — evenly spaced, transparent, same character identity, same body size, feet touch the same baseline"). Reuse verbatim style tokens so frames stay on-model (see `unity-aaa-graphics/references/prompt-library.md`).
    - Frame-count guidance: idle/bob 2–6, walk 6–8, attack/fire 5–10. More frames = smoother but heavier; ease the in-betweens, don't just linearly tween.
-2. **Slice** in Unity (Sprite Editor → Grid by Cell Count / Sequence) with a consistent pivot.
-3. **Build Animation Clips** (one per state), set frame rate (10–14 fps reads well for casual), loop idle/walk, one-shot attack/death.
-4. **Animator Controller** with states + transitions driven by parameters/triggers (`Speed` float, `Fire` trigger, `IsDead` bool).
-5. **Pack frames into a Sprite Atlas** to keep draw calls down.
+3. **Extrude/pad the sheet** before import to prevent texture bleed: `unity-image-generator/scripts/extrude_atlas.py --rows 1 --cols <N> --extrude 2 --padding 2 ...`; slice using the manifest's frame rects.
+4. **Slice** in Unity (Sprite Editor → Grid by Cell Count / Sequence or manifest rects) with a consistent pivot/baseline. Reject sheets where the character visibly changes size or feet/ground contact drift.
+5. **Build Animation Clips** (one per state), set frame rate (10–14 fps reads well for casual), loop idle/walk, one-shot attack/death.
+6. **Animator Controller** with states + transitions driven by parameters/triggers (`Speed` float, `Fire` trigger, `IsDead` bool).
+7. **Pack frames into a Sprite Atlas** to keep draw calls down.
 
 See `references/animation-recipes.md` for the clip-build + Animation Event code.
 

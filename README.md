@@ -272,6 +272,7 @@ See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results
 - **Treat generated art as source, not final assets.** Promote source files through `unity-asset-pipeline`: preserve/validate alpha, enforce import settings, generate prefabs, record BeautyCell screenshots, and enter only approved prefabs into the registry.
 - **Compose before scaling.** Use `unity-scene-composition` to build one BeautyCell/golden screen before generating dozens of assets; fix camera, scale, focal path, density, and color zoning there first.
 - **Adopt proven Unity production gates.** The asset pipeline now tracks SpriteAtlas groups, Import Presets/AssetPostprocessor defaults, optional Addressables labels, and optional URP 2D secondary textures so popular Unity best practices become contract fields and validators, not tribal memory.
+- **Use best-of-N generation for production art.** Inspired by image-extension workflows, `unity-image-generator` can now generate multiple candidates, run pixel + vision QA, select the best with `select_best_candidate.py`, and extrude/pad sprite or tile sheets with `extrude_atlas.py` before Unity import.
 - **Design for hybrid monetization (ads + IAP).** Only ~1.8% of players ever buy an IAP, so rewarded/interstitial ads carry most casual revenue — plan both, not one.
 - **Instrument retention (D1/D7/D30) and tune via remote config / A/B testing** rather than guessing. The `unity-analytics-liveops` skill covers the funnels, SDKs, and experiments.
 

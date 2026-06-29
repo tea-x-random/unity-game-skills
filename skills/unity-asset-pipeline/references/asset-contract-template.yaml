@@ -16,6 +16,8 @@ state: default                     # default | damaged | alternate | seasonal | 
 source:
   generator: tripo                 # tripo | gemini | authored | kitbash | vendor
   source_art: Assets/Art/Source/meadow_tree_a.png
+  candidate_set: Assets/Art/QA/meadow_tree_a.candidates.json
+  best_candidate_report: Assets/Art/QA/meadow_tree_a.best.json
   prompt_hash: "sha256:<hash-of-final-prompt-or-brief>"
   reference_pack: meadow_family_v1
   seed: null
@@ -65,6 +67,7 @@ import:
   ios_format: ASTC_6x6
   android_format: ASTC_6x6
   sprite_atlas: Assets/Art/Atlases/Environment_Midground.spriteatlas
+  extruded_atlas_manifest: null     # set for sheet/tile atlas exports from extrude_atlas.py
   addressable: true
   readable: false
 
