@@ -38,8 +38,9 @@ Create `Assets/GameArt/_ArtDirection/composition.yaml` from `references/composit
 4. **Budget density.** Give each object a `density_cost` (small=1, medium=2, large/hero=3) and set a per-screen max. Do not solve an empty scene by scattering random props.
 5. **Zone color and contrast.** Reserve highest saturation/contrast for interactables, rewards, and focal accents. Backgrounds and filler props must recede.
 6. **Place only registry assets.** Read `unity-asset-pipeline` registry entries, filter by `composition.layer`, `visual_weight`, `allowed_zones`, and `density_cost`; never drag source art or unapproved prefabs into the scene.
-7. **Capture screenshots.** Use `unity-mcp-bridge` `manage_camera(screenshot)` or the BeautyCell renderer. Compare against the golden screen and run the checklist in `references/screenshot-acceptance.md`.
-8. **Iterate by moving/removing first, not generating more.** If composition fails, fix camera, scale, contrast, density, and layering before generating additional assets.
+7. **Normalize scale + grounding.** Set target screen-height percent per role and apply one shared `shadow_profile`/contact-darkening rule. Foreground actors/props without a consistent contact shadow read as floating stickers.
+8. **Capture screenshots.** Use `unity-mcp-bridge` `manage_camera(screenshot)` or the BeautyCell renderer. Compare against the golden screen and run the checklist in `references/screenshot-acceptance.md`.
+9. **Iterate by moving/removing first, not generating more.** If composition fails, fix camera, scale, contrast, density, and layering before generating additional assets.
 
 ## Layer rules
 
@@ -53,6 +54,21 @@ Create `Assets/GameArt/_ArtDirection/composition.yaml` from `references/composit
 ## Big / medium / small shape ratio
 
 A premium screen usually needs shape hierarchy: 1–2 big anchors, 3–6 medium supports, and many small details only where the eye can rest. If every prop is the same screen height, the scene reads like a sticker pile. Encode target screen-height ranges in `composition.yaml` and enforce through asset `target_screen_height_percent`.
+
+## Layer contrast budget
+
+Do not apply one identical prompt/style intensity to every layer. The background/ground must usually spend **less** contrast, outline, and saturation budget than gameplay:
+
+- gameplay/interactables: highest contrast, strongest outline, most saturated accents;
+- hero/foreground props: high readability, but fewer than gameplay-critical objects;
+- midground/filler props: medium contrast, lower density;
+- background/ground: low contrast, low saturation, sparse detail, thin/no outline.
+
+If a ground tile has the same bold black outline and hot accent palette as characters, the screenshot will look busy even when each asset is well drawn. Fix layer contrast before adding post-processing.
+
+## Contact shadows / grounding
+
+Every object that touches the world needs a consistent grounding treatment. Prefer a shared soft blob shadow or contact-AO prefab referenced by `shadow_profile`, with one global light/shadow direction. Do not rely on shadows baked into individual generated PNGs — they disagree once composited and break the BeautyCell.
 
 ## Screenshot acceptance
 

@@ -61,6 +61,15 @@ shape_rhythm:
     support_prop: [6, 16]
     filler_prop: [2, 8]
 
+scale_normalization:
+  enforce_target_screen_height_percent: true
+  reject_equal_weight_sticker_pile: true
+  default_role_heights_percent:
+    hero: 28
+    primary_gameplay: 16
+    support_prop: 10
+    filler_prop: 5
+
 density_budget:
   max_density_cost_per_screen: 24
   max_interesting_objects_per_screen: 12
@@ -92,6 +101,8 @@ shadow_and_contact:
   shadow_softness: soft
   contact_darkening_strength: medium
   blob_shadow_profile: soft_blob_v1
+  required_for_layers: [midground, gameplay, foreground]
+  forbid_baked_png_shadows: true
 
 family_distribution:
   meadow_vegetation:

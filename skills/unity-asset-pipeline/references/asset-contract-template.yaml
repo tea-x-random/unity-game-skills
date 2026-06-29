@@ -88,6 +88,8 @@ qa:
   # These are output fields. Validators or Unity editor tools set these; do not hand-author to bypass gates.
   alpha_valid: false
   sprite_qa_report: Assets/Art/QA/meadow_tree_a.sprite-qa.json
+  image_critique_valid: false
+  image_critique_report: Assets/Art/QA/meadow_tree_a.critique.json
   import_valid: false
   import_report: Assets/Art/Approved/meadow_tree_a/import-qa.json
   scale_valid: false

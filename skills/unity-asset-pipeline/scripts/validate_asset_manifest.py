@@ -7,7 +7,8 @@ checks machine-readable contract data, not aesthetic quality.
 Examples:
   python3 validate_asset_manifest.py Assets/Art/Approved/tree/asset-contract.yaml \
     --art-spec Assets/GameArt/_ArtDirection/art-spec.yaml \
-    --sprite-qa Assets/Art/QA/tree.sprite-qa.json
+    --sprite-qa Assets/Art/QA/tree.sprite-qa.json \
+    --image-critique Assets/Art/QA/tree.critique.json
 
   python3 validate_asset_manifest.py --registry Assets/Art/Approved/registry.yaml \
     --art-spec Assets/GameArt/_ArtDirection/art-spec.yaml --require-approved
@@ -233,6 +234,15 @@ def validate_contract(contract_path: Path, args: argparse.Namespace) -> dict:
         ok = qa.get("result") == "pass" and qa.get("summary", {}).get("failures", 0) == 0
         add(checks, "sprite_qa.result", ok, "Referenced sprite QA report passes.", {"report": args.sprite_qa, "result": qa.get("result"), "summary": qa.get("summary")})
 
+    if args.image_critique:
+        critique = load_data(args.image_critique)
+        verdict = get_path(critique, "critique.verdict") or critique.get("verdict")
+        overall = get_path(critique, "critique.overall") or critique.get("overall")
+        if overall is None:
+            overall = get_path(critique, "critique.scores.overall")
+        ok = verdict == "pass"
+        add(checks, "image_critique.result", ok, "Referenced vision critique passes.", {"report": args.image_critique, "verdict": verdict, "overall": overall})
+
     if args.require_approved:
         qa = get_path(c, "qa", {}) or {}
         bool_flags = [k for k, v in qa.items() if isinstance(v, bool) and k != "approved"]
@@ -302,6 +312,7 @@ def build_parser():
     p.add_argument("--art-spec", help="Path to art-spec.yaml; style_id must match")
     p.add_argument("--composition", help="Path to composition.yaml; camera_contract must match when fields exist")
     p.add_argument("--sprite-qa", help="Path to validate_sprite.py JSON report; must pass")
+    p.add_argument("--image-critique", help="Path to critique_image.py JSON report; verdict must pass")
     p.add_argument("--require-approved", action="store_true", help="Require all boolean qa flags and qa.approved to be true")
     p.add_argument("--json-report", help="Write validation report to this path")
     return p

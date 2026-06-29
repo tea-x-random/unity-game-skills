@@ -50,8 +50,14 @@ Example for **tower defense** — all of these are "generate," not "fill with gr
 ### 3. Generate with AAA prompts (load `unity-image-generator` / `unity-3d-generator`)
 Use the **prompt template and genre exemplar prompts** in `references/prompt-library.md` — not one-line prompts. Generate environment textures/tilesets and props, condition each on the style sheet, and run the refine loop until each asset clears the per-asset rubric. Import with correct settings (Sprite/Texture, ASTC, atlas) per the generator skills.
 
+**Generate per layer, not one intensity for everything.** The same "bold saturated thick black outline" tokens that make a hero asset readable can destroy a ground tile: the ground becomes a noisy foreground subject and the characters stop popping. Background/ground prompts should usually say: low contrast, lower saturation, sparse subtle detail, thin/no outline, recessive surface, NOT busy, NOT focal. Validate with `unity-image-generator/scripts/validate_sprite.py --tile --square --power-of-two` and `critique_image.py --role background_tile --must-recede`.
+
+**Run subject-correctness QA.** A generated image can be attractive and still semantically wrong (e.g. "mossy rock" rendered as a planet/globe). Use `critique_image.py --subject "<exact intended subject>"`; any subject score ≤1 blocks import. Pixel/alpha QA cannot catch this.
+
 ### 4. Light, finish, and compose the scene (load `unity-graphics`)
 Apply the render pipeline — this is what turns flat sprites into a lit scene: URP set up, a real lighting setup (not uniform flat), soft shadows/AO where it reads, a designed backdrop or gradient (not a hard oval), mobile-safe post (subtle bloom/vignette/color grade), and depth cues (fog/parallax/scale). Build forms + palette + lighting first; add post last.
+
+**Ground every object.** Foreground props/characters need one shared contact-shadow/blob-shadow treatment. Do not accept cutouts floating on the ground, and do not bake inconsistent shadows into each PNG.
 
 ### 5. Add juice (load `unity-gameplay-systems`)
 Short, additive particle/feedback bursts (place, hit, wave-clear, win) lift perceived quality cheaply.
@@ -69,11 +75,14 @@ Capture a real device-resolution screenshot via MCP and score 1–10 on each axi
 | **Depth & hierarchy** | The scene has clear layering and a focal hierarchy by whatever means the style uses — lighting/shadow/gradient for rendered styles, or value/overlap/scale/framing for flat styles — never an accidental uniform mush |
 | **Composition** | Clear focal point, intentional framing, negative space used with intent (filled, or deliberately calm) |
 | **Finish consistency** | Every element flat *or* every element rendered — never mixed |
+| **Layer contrast budget** | Background/ground recedes; gameplay/interactables get the strongest contrast/saturation/outline; no busy tile competes with heroes |
+| **Subject correctness** | Every asset is what the brief says it is — attractive wrong-subject generations are rejected |
+| **Grounding** | Props/characters sit in the world via consistent contact shadow/AO; no floating stickers |
 | **Readability** | Gameplay-critical elements (path, towers, enemies, the board/grid) pop against their ground |
 | **HUD/UI quality** | Designed readouts/buttons, on-theme — not default labels on flat bars |
 | **Animation** | Assets that act are animated (idle/move/attack/hit/death as needed); actions fire gameplay on the correct frame — nothing static where motion is expected |
 
-Auto-fail anti-patterns (ship-blockers): *placeholder* solid-color ground used because no art was made (≠ an intentional flat-design fill); procedural blobs for primary surfaces; one generated asset amid untextured everything-else; hard-oval vignette as the only "lighting" on a style that wanted real lighting; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
+Auto-fail anti-patterns (ship-blockers): *placeholder* solid-color ground used because no art was made (≠ an intentional flat-design fill); procedural blobs for primary surfaces; one generated asset amid untextured everything-else; busy/high-contrast ground with the same outline/saturation as heroes; attractive but wrong-subject asset; over-rendered glossy gradients when the locked finish is flat/cel; floating sticker props with no contact shadow; hard-oval vignette as the only "lighting" on a style that wanted real lighting; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
 
 ## Where this sits
 

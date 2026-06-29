@@ -75,6 +75,15 @@ no text. NOT: flat fill, hard edges, visible seams.
 
 Import tiling textures with `wrapMode = Repeat`, mipmaps **on** for 3D/material use (off for crisp 2D UI), ASTC on iOS (see `unity-image-generator`).
 
+> **Layer-aware intensity (critical).** "High-detail" above is for surfaces that should read strongly. **Ground/background tiles in a top-down game usually need the OPPOSITE: low contrast, lower saturation, sparse detail, thin/no outline**, so the ground recedes and characters pop. If you reuse the hero's bold-outline saturated tokens on the ground, the screen looks busy even when each asset is well drawn. Recessive ground exemplar:
+> ```
+> Seamless tiling top-down [grass] ground, recessive background surface, LOW contrast,
+> muted desaturated [palette], soft even value, sparse subtle detail, thin or no outlines,
+> tiles seamlessly, no centered subject, no text.
+> NOT: busy, high-contrast, bold black outlines on every blade, saturated, focal subject, seams.
+> ```
+> Validate the recede: `validate_sprite.py [tile] --tile --square --power-of-two` + `critique_image.py --role background_tile --must-recede`.
+
 ## Genre art kits
 
 Each kit lists the surfaces to generate (default = generate all) and an exemplar prompt for the signature asset. Adapt tokens to your direction.

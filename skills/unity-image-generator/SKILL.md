@@ -29,7 +29,7 @@ Flags: `--prompt/-p`, `--filename/-f` (write under `Assets/`), `--input-image/-i
 
 **Alpha is preserved by default — never flatten foreground sprites onto white.** `generate_image.py` writes real PNG alpha unless you ask otherwise:
 - `--alpha-mode preserve` (default) — keep the model's RGBA verbatim. Use for sprites the model already returned with transparency.
-- `--alpha-mode chroma-key [--chroma-key-color magenta|cyan|r,g,b] [--chroma-key-threshold N]` — generate the subject on a solid matte, then key it to real alpha + autocrop + uniform pad. This is the reliable transparency path (see "Transparency" below).
+- `--alpha-mode chroma-key [--chroma-key-color magenta|cyan|r,g,b] [--chroma-key-threshold N] [--chroma-key-defringe N]` — generate the subject on a solid matte, then key it to real alpha + autocrop + uniform pad. `--chroma-key-defringe` (default 1) erodes the anti-aliased edge ring to remove the matte-color halo; raise it if a fringe survives, set 0 to disable. This is the reliable transparency path (see "Transparency" below).
 - `--alpha-mode opaque` — flatten onto white. ONLY for assets that must be opaque: the iOS app icon, full-bleed backgrounds, seamless tiling textures.
 
 > A prior version of this script always composited RGBA onto white, producing white-matted sprites and pale edge halos after import. That is fixed; do not reintroduce it. For any gameplay-facing foreground object, leave alpha-mode at `preserve` or use `chroma-key`, then run the validator gate below.
@@ -151,6 +151,73 @@ Reject and regenerate/fix the asset if any of these fail:
 - **palette distance** too far from the locked project palette.
 
 The Unity import gate should consume the JSON report as evidence; do not allow a generated foreground sprite into a runtime prefab without a passing alpha QA report.
+
+For tiles/backgrounds, use tile mode instead of alpha mode:
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
+  Assets/Art/Source/tile_grass.png \
+  --tile --square --power-of-two \
+  --expected-finish flat --fail-over-render \
+  --json-report Assets/Art/QA/tile_grass.sprite-qa.json
+```
+
+For a target that is explicitly flat/cel, `--expected-finish flat|cel` warns (or fails with `--fail-over-render`) when the asset drifts into glossy gradients or painterly rendering.
+
+### Vision critique gate — catch what pixel metrics miss
+
+Self-grading by the generating agent is unreliable — broken art silently "looks fine." After alpha QA, run `critique_image.py`, which shows the rendered image back to a vision model and scores it against the STATED intent. This catches the failures `validate_sprite.py` cannot: **wrong subject** (a "rock" that generated as a planet Earth), **over-rendered shading vs a flat brief**, outline-weight/palette drift, **floating objects / baked-in fake shadows**, **busy backgrounds that should recede**, and edge halos.
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/critique_image.py \
+  Assets/Art/Source/prop_rock.png \
+  --subject "a cute mossy grey rock boulder" \
+  --role foreground_prop --finish flat --outline bold \
+  --palette '#1A1A2E,#4CD964,#9AA0A6' \
+  --json-report Assets/Art/QA/prop_rock.critique.json
+```
+
+It exits non-zero on `fail` and lists `blocking_issues` + `top_fixes`. Feed those fixes back into a **rewritten** prompt (don't reroll the same one). Needs `GEMINI_API_KEY`; if missing, do a documented manual review instead and say so — never claim a critique that did not run. Use `--dry-run` to inspect the request without calling the API.
+
+## Generate per visual LAYER — recessive vs focal (most-missed rule)
+
+The #1 reason a scene of individually-fine assets "feels weak" is that **ground/background art was generated with the same bold-ink, saturated, high-detail DNA as the heroes**, so it competes instead of receding and nothing pops. Style tokens are NOT uniform across layers — split them by composition role (the layer comes from `unity-scene-composition`'s `composition.yaml`):
+
+- **Hero / gameplay / foreground props** → full style DNA: bold outline, full saturation, one clear highlight, readable focal detail. Generate at **2K masters** (see below).
+- **Midground props** → slightly reduced: thinner outline, slightly lower saturation, less internal detail than heroes.
+- **Background / ground tiles** → **deliberately recessive**: thin or NO outline, **lower saturation and contrast**, **sparse** detail, even flat value. The ground is a stage, not a subject. A busy, fully-ink-outlined, saturated grass tile is the classic mistake — it reads as foreground and buries the characters.
+
+Concrete counter-steer for a recessive ground tile (note the opposite negatives to a hero):
+```
+seamless tiling top-down <STYLE> grass ground, LOW contrast, muted desaturated <PALETTE>,
+soft even value, sparse subtle detail, thin or no outlines, recessive background surface
+— NOT busy, NOT high-contrast, NOT bold black outlines on every blade, NOT saturated, NOT a focal subject, no text
+```
+Validate the recede with the critique gate using `--role background_tile --must-recede`.
+
+## Resolution: 2K masters for anything the player looks at
+
+Generate hero/foreground/character/prop masters at **2K** (retina iOS is 2x–3x). 1K is for fast composition checks and truly tiny/recessive elements only. The batch-script habit of generating everything at 1K and never refining produces soft, low-detail in-game assets. Workflow: 1K to lock composition → rewrite prompt if wrong → refine at 2K via `--input-image` with verbatim style tokens → downscale in Unity per device tier, never upscale.
+
+## Tiling ground/terrain textures (square, seamless, validated)
+
+Tiles are not sprites — different rules, and they are easy to get wrong:
+- Request a **square** tile and key it to a **power-of-two** size (512/1024) — a 1408×768 "tile" will not tile cleanly.
+- **Verify seamlessness**, don't trust the prompt: `validate_sprite.py <tile> --tile --square --power-of-two` checks opposite-edge continuity and dimensions.
+- Import with `wrapMode = Repeat` and **mipmaps ON** (opposite of UI sprites).
+- **Size the tile to the world grid**, not the canvas — a tile must repeat several times per screen; a single 1K image stretched across the screen reads as one giant blob and exposes the repeat.
+- Keep tiles recessive (see layer rule above).
+
+## Grounding: never bake shadows into the cutout
+
+Floating "sticker" objects are a top cause of a cheap look. The contact shadow belongs to the **scene/prefab**, not the asset:
+- Generate foreground props/characters on the solid matte with **no ground shadow** in the matte (the `CHROMA` prompt should say "no ground shadow").
+- Add grounding in Unity as a separate **soft blob-shadow sprite** or contact AO with a **consistent light direction** across the whole family (owned by `unity-scene-composition` shadow rules + `unity-asset-pipeline` `shadow_profile`).
+- A baked-in, asset-specific shadow fights every other asset's light direction once composited — the critique gate penalizes it.
+
+## Verify in the ENGINE, not in a browser or a PIL mock
+
+A `style-guide/index.html` page or a Python/PIL composite is a **concept preview, not proof**. Assets that look acceptable in an HTML grid routinely fall apart in Unity (wrong scale, no real lighting, floating, busy ground, seams). The acceptance test is an in-engine screenshot at device resolution through `unity-mcp-bridge` + the `unity-asset-pipeline` BeautyCell gate. Do not present a browser/PIL composite as evidence the art is game-ready.
 
 ## Environment & terrain textures (most-missed assets)
 

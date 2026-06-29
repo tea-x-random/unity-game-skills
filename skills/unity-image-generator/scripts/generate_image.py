@@ -39,14 +39,18 @@ def _parse_color(text):
     return tuple(max(0, min(255, int(p))) for p in parts)
 
 
-def chroma_key(image, key_color, threshold=60, autocrop=True, pad=4):
+def chroma_key(image, key_color, threshold=60, autocrop=True, pad=4, defringe=1):
     """Cut a solid chroma background to real alpha.
 
     Samples within ``threshold`` (Euclidean RGB distance) of ``key_color`` are
     made transparent. Optionally autocrops to the opaque bounding box and adds
     uniform transparent padding so every sprite in a family trims consistently.
+
+    ``defringe`` erodes the alpha mask by N pixels so the anti-aliased outer
+    ring (which still carries key-color spill) is dropped — this removes the
+    magenta/cyan/white halo that otherwise survives a distance-threshold key.
     """
-    from PIL import Image as PILImage
+    from PIL import Image as PILImage, ImageFilter
 
     rgba = image.convert("RGBA")
     px = rgba.load()
@@ -59,6 +63,11 @@ def chroma_key(image, key_color, threshold=60, autocrop=True, pad=4):
             dr, dg, db = r - kr, g - kg, b - kb
             if dr * dr + dg * dg + db * db <= thr_sq:
                 px[x, y] = (r, g, b, 0)
+    if defringe and defringe > 0:
+        alpha = rgba.getchannel("A")
+        for _ in range(defringe):
+            alpha = alpha.filter(ImageFilter.MinFilter(3))
+        rgba.putalpha(alpha)
     if autocrop:
         bbox = rgba.getbbox()
         if bbox:
@@ -70,7 +79,7 @@ def chroma_key(image, key_color, threshold=60, autocrop=True, pad=4):
     return rgba
 
 
-def save_image(image, output_path, alpha_mode, key_color, threshold):
+def save_image(image, output_path, alpha_mode, key_color, threshold, defringe=1):
     """Persist a generated PIL image as PNG under the chosen alpha policy.
 
     alpha_mode:
@@ -81,7 +90,7 @@ def save_image(image, output_path, alpha_mode, key_color, threshold):
     from PIL import Image as PILImage
 
     if alpha_mode == "chroma-key":
-        out = chroma_key(image, key_color, threshold=threshold)
+        out = chroma_key(image, key_color, threshold=threshold, defringe=defringe)
         out.save(str(output_path), "PNG")
         return "chroma-key"
 
@@ -159,6 +168,12 @@ def main():
         type=int,
         default=60,
         help="RGB distance threshold for --alpha-mode chroma-key (default: 60).",
+    )
+    parser.add_argument(
+        "--chroma-key-defringe",
+        type=int,
+        default=1,
+        help="Alpha erosion pixels after chroma-key to remove matte-color edge spill (default: 1; use 0 to disable).",
     )
 
     args = parser.parse_args()
@@ -254,6 +269,7 @@ def main():
                     alpha_mode=args.alpha_mode,
                     key_color=args.chroma_key_color,
                     threshold=args.chroma_key_threshold,
+                    defringe=args.chroma_key_defringe,
                 )
                 print(f"Saved PNG with alpha-mode: {saved_mode}")
                 image_saved = True

@@ -63,13 +63,14 @@ qa:
 
 ## Validate the contract + source: `validate_asset_manifest.py`
 
-Run before importing. It checks the contract is well-formed, that `style_id` matches the project `art-spec.yaml`, that the `camera_contract` agrees with the scene composition profile, and (for 2D) ingests the sprite QA report from `unity-image-generator/scripts/validate_sprite.py` so alpha/halo/palette failures block approval:
+Run before importing. It checks the contract is well-formed, that `style_id` matches the project `art-spec.yaml`, that the `camera_contract` agrees with the scene composition profile, and (for 2D) ingests both the pixel QA report from `unity-image-generator/scripts/validate_sprite.py` and the vision critique report from `unity-image-generator/scripts/critique_image.py` so alpha/halo/palette/finish failures AND wrong-subject/role-fit failures block approval:
 
 ```bash
 python3 ~/.claude/skills/unity-asset-pipeline/scripts/validate_asset_manifest.py \
   Assets/Art/Approved/meadow_tree_a/asset-contract.yaml \
   --art-spec Assets/GameArt/_ArtDirection/art-spec.yaml \
   --sprite-qa Assets/Art/QA/meadow_tree_a.sprite-qa.json \
+  --image-critique Assets/Art/QA/meadow_tree_a.critique.json \
   --composition Assets/GameArt/_ArtDirection/composition.yaml
 ```
 

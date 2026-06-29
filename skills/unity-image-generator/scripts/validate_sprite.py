@@ -10,12 +10,14 @@
 This is a production gate, not a subjective art critique. It catches the
 common failures that make AI-generated sprites look cheap once assembled in
 Unity: missing alpha, white/chroma edge halos, loose trimming, inconsistent
-padding, oversized textures, and palette drift.
+padding, oversized textures, palette drift, over-rendered flat/cel targets,
+and non-square/non-seamless ground tiles.
 
 Examples:
   python3 validate_sprite.py Assets/Art/Sprites/tree.png --require-alpha --json-report tree.qa.json
   python3 validate_sprite.py coin.png --require-alpha --min-padding 4 --max-padding-variance 12
   python3 validate_sprite.py icon.png --palette '#E54B4B,#FFD166,#2A9D8F' --max-palette-distance 85
+  python3 validate_sprite.py tile_grass.png --tile --square --power-of-two --expected-finish flat
 """
 
 from __future__ import annotations
@@ -108,6 +110,73 @@ def sample_opaque_pixels(rgba, alpha, width: int, height: int, threshold: int, m
     return points
 
 
+def is_power_of_two(n: int) -> bool:
+    return n > 0 and (n & (n - 1)) == 0
+
+
+def quantize_distinct_colors(rgba, alpha, width, height, threshold, bits=4):
+    """Count distinct quantized colors among opaque pixels (flatness proxy).
+
+    A flat/cel asset uses few distinct tones; a glossy/gradient/painterly asset
+    uses many. Returned as a ratio of distinct buckets to a fixed cap so it is
+    comparable across image sizes.
+    """
+    shift = 8 - bits
+    seen = set()
+    sampled = 0
+    stride = max(1, int(math.sqrt(max(1, (width * height)) / 20000)))
+    for y in range(0, height, stride):
+        for x in range(0, width, stride):
+            if alpha[x, y] > threshold:
+                r, g, b, _ = rgba[x, y]
+                seen.add(((r >> shift), (g >> shift), (b >> shift)))
+                sampled += 1
+    return len(seen), sampled
+
+
+def mean_local_gradient(rgba, alpha, width, height, threshold):
+    """Average per-channel neighbor delta on the interior of the silhouette.
+
+    Low for flat fills, high for soft gradients / glossy rendering. Normalized
+    to 0..1 (delta/255).
+    """
+    total = 0.0
+    count = 0
+    stride = max(1, int(math.sqrt(max(1, (width * height)) / 20000)))
+    for y in range(0, height - 1, stride):
+        for x in range(0, width - 1, stride):
+            if alpha[x, y] <= threshold or alpha[x + 1, y] <= threshold or alpha[x, y + 1] <= threshold:
+                continue
+            r, g, b, _ = rgba[x, y]
+            r1, g1, b1, _ = rgba[x + 1, y]
+            r2, g2, b2, _ = rgba[x, y + 1]
+            total += (abs(r - r1) + abs(g - g1) + abs(b - b1) + abs(r - r2) + abs(g - g2) + abs(b - b2)) / 6.0
+            count += 1
+    return (total / count / 255.0) if count else 0.0
+
+
+def edge_wrap_difference(rgba, width, height):
+    """Mean absolute RGB difference between opposite edges (seamless-tile proxy).
+
+    0 = edges match perfectly (tiles cleanly); higher = visible seam.
+    """
+    def col(x):
+        return [rgba[x, y][:3] for y in range(height)]
+
+    def row(y):
+        return [rgba[x, y][:3] for x in range(width)]
+
+    def mad(a, b):
+        s = 0
+        for pa, pb in zip(a, b):
+            s += abs(pa[0] - pb[0]) + abs(pa[1] - pb[1]) + abs(pa[2] - pb[2])
+        return s / (len(a) * 3 * 255.0)
+
+    lr = mad(col(0), col(width - 1))
+    tb = mad(row(0), row(height - 1))
+    return {"left_right": lr, "top_bottom": tb, "max": max(lr, tb)}
+
+
 def validate(args: argparse.Namespace) -> dict:
     path = Path(args.image)
     checks: list[Check] = []
@@ -131,8 +200,17 @@ def validate(args: argparse.Namespace) -> dict:
             {"max_width": max_w, "max_height": max_h},
         ))
 
+    if args.square:
+        ok = width == height
+        checks.append(Check(
+            "resolution.square",
+            "pass" if ok else "fail",
+            f"Tile/atlas texture is square ({width}x{height})." if ok else f"Expected a square texture, got {width}x{height}.",
+            {"width": width, "height": height},
+        ))
+
     if args.power_of_two:
-        ok = width & (width - 1) == 0 and height & (height - 1) == 0
+        ok = is_power_of_two(width) and is_power_of_two(height)
         checks.append(Check(
             "resolution.power_of_two",
             "pass" if ok else "fail",
@@ -164,17 +242,20 @@ def validate(args: argparse.Namespace) -> dict:
             {"max_corner_alpha": args.max_corner_alpha},
         ))
 
-    checks.append(Check(
-        "silhouette.coverage",
-        "pass" if args.min_coverage <= coverage <= args.max_coverage else "fail",
-        f"Opaque coverage is {coverage:.3f}; expected {args.min_coverage:.3f}..{args.max_coverage:.3f}.",
-        coverage,
-        {"min": args.min_coverage, "max": args.max_coverage},
-    ))
-
-    bbox = alpha_bbox(alpha, width, height, args.alpha_threshold)
+    # Coverage / bbox / padding / halo only apply to transparent foreground sprites.
+    # Full-bleed tiles and backgrounds are intentionally opaque edge-to-edge.
+    bbox = None
     padding = None
-    if bbox:
+    if not args.tile:
+        checks.append(Check(
+            "silhouette.coverage",
+            "pass" if args.min_coverage <= coverage <= args.max_coverage else "fail",
+            f"Opaque coverage is {coverage:.3f}; expected {args.min_coverage:.3f}..{args.max_coverage:.3f}.",
+            coverage,
+            {"min": args.min_coverage, "max": args.max_coverage},
+        ))
+        bbox = alpha_bbox(alpha, width, height, args.alpha_threshold)
+    if not args.tile and bbox:
         left, top, right, bottom = bbox
         padding = {
             "left": left,
@@ -218,34 +299,35 @@ def validate(args: argparse.Namespace) -> dict:
             {"x_ratio": loose_x, "y_ratio": loose_y, "padding": padding},
             {"max_loose_padding_ratio": args.max_loose_padding_ratio},
         ))
-    else:
+    elif not args.tile:
         checks.append(Check("alpha.bbox", "fail", "No opaque silhouette found."))
 
     # Edge halo detection: matte-colored RGB values on the silhouette edge almost
     # always mean the PNG was flattened or chroma-keyed poorly before Unity import.
-    edge_count = 0
-    halo_count = 0
-    halo_by_color = {name: 0 for name in MATTE_COLORS}
-    for y in range(height):
-        for x in range(width):
-            if not is_edge_pixel(alpha, x, y, width, height, args.edge_alpha_threshold):
-                continue
-            edge_count += 1
-            r, g, b, _ = rgba[x, y]
-            for name, color in MATTE_COLORS.items():
-                if dist_rgb((r, g, b), color) <= args.halo_distance:
-                    halo_count += 1
-                    halo_by_color[name] += 1
-                    break
-    halo_ratio = halo_count / edge_count if edge_count else 0
-    ok = halo_count <= args.max_halo_pixels and halo_ratio <= args.max_halo_ratio
-    checks.append(Check(
-        "alpha.edge_halo",
-        "pass" if ok else "fail",
-        f"Detected {halo_count} matte-colored edge pixels ({halo_ratio:.3%} of edge).",
-        {"edge_pixels": edge_count, "halo_pixels": halo_count, "halo_ratio": halo_ratio, "by_color": halo_by_color},
-        {"max_halo_pixels": args.max_halo_pixels, "max_halo_ratio": args.max_halo_ratio, "halo_distance": args.halo_distance},
-    ))
+    if not args.tile:
+        edge_count = 0
+        halo_count = 0
+        halo_by_color = {name: 0 for name in MATTE_COLORS}
+        for y in range(height):
+            for x in range(width):
+                if not is_edge_pixel(alpha, x, y, width, height, args.edge_alpha_threshold):
+                    continue
+                edge_count += 1
+                r, g, b, _ = rgba[x, y]
+                for name, color in MATTE_COLORS.items():
+                    if dist_rgb((r, g, b), color) <= args.halo_distance:
+                        halo_count += 1
+                        halo_by_color[name] += 1
+                        break
+        halo_ratio = halo_count / edge_count if edge_count else 0
+        ok = halo_count <= args.max_halo_pixels and halo_ratio <= args.max_halo_ratio
+        checks.append(Check(
+            "alpha.edge_halo",
+            "pass" if ok else "fail",
+            f"Detected {halo_count} matte-colored edge pixels ({halo_ratio:.3%} of edge).",
+            {"edge_pixels": edge_count, "halo_pixels": halo_count, "halo_ratio": halo_ratio, "by_color": halo_by_color},
+            {"max_halo_pixels": args.max_halo_pixels, "max_halo_ratio": args.max_halo_ratio, "halo_distance": args.halo_distance},
+        ))
 
     if args.palette:
         palette = parse_palette(args.palette)
@@ -262,6 +344,40 @@ def validate(args: argparse.Namespace) -> dict:
                 {"avg": avg_distance, "p95": p95, "samples": len(samples)},
                 {"max_avg": args.max_palette_distance, "palette": args.palette},
             ))
+
+    if args.expected_finish in {"flat", "cel"}:
+        distinct, sampled = quantize_distinct_colors(rgba, alpha, width, height, args.alpha_threshold)
+        # This is a heuristic warning by default; fail only if user asks with --fail-over-render.
+        ok = distinct <= args.max_quantized_colors
+        status = "pass" if ok else ("fail" if args.fail_over_render else "warn")
+        checks.append(Check(
+            "finish.quantized_color_count",
+            status,
+            f"Detected {distinct} quantized color buckets in {sampled} sampled opaque pixels; target finish is {args.expected_finish}.",
+            {"distinct_buckets": distinct, "samples": sampled},
+            {"max_quantized_colors": args.max_quantized_colors},
+        ))
+        grad = mean_local_gradient(rgba, alpha, width, height, args.alpha_threshold)
+        ok = grad <= args.max_local_gradient
+        status = "pass" if ok else ("fail" if args.fail_over_render else "warn")
+        checks.append(Check(
+            "finish.local_gradient",
+            status,
+            f"Mean local RGB gradient is {grad:.4f}; target finish is {args.expected_finish}.",
+            grad,
+            {"max_local_gradient": args.max_local_gradient},
+        ))
+
+    if args.tile:
+        wrap = edge_wrap_difference(rgba, width, height)
+        ok = wrap["max"] <= args.max_wrap_difference
+        checks.append(Check(
+            "tile.edge_wrap",
+            "pass" if ok else "fail",
+            f"Opposite-edge color difference max is {wrap['max']:.4f}; lower is more seamless.",
+            wrap,
+            {"max_wrap_difference": args.max_wrap_difference},
+        ))
 
     fail_count = sum(1 for c in checks if c.status == "fail")
     warn_count = sum(1 for c in checks if c.status == "warn")
@@ -297,10 +413,17 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--max-halo-ratio", type=float, default=0.01, help="Max halo pixels as fraction of edge pixels (default: 0.01)")
     p.add_argument("--max-width", type=int, help="Max texture width")
     p.add_argument("--max-height", type=int, help="Max texture height")
+    p.add_argument("--square", action="store_true", help="Require square dimensions (tiles/icons/atlases)")
     p.add_argument("--power-of-two", action="store_true", help="Require power-of-two dimensions")
+    p.add_argument("--tile", action="store_true", help="Enable seamless-tile checks (edge wrap difference)")
+    p.add_argument("--max-wrap-difference", type=float, default=0.08, help="Max opposite-edge RGB difference for --tile (default: 0.08)")
     p.add_argument("--palette", help="Comma-separated project palette hexes, e.g. '#E54B4B,#FFD166,#2A9D8F'")
     p.add_argument("--max-palette-distance", type=float, default=95, help="Max average RGB distance from palette (default: 95)")
     p.add_argument("--palette-samples", type=int, default=5000, help="Max opaque pixels sampled for palette check")
+    p.add_argument("--expected-finish", choices=["any", "flat", "cel"], default="any", help="Warn/fail if a flat/cel target appears over-rendered")
+    p.add_argument("--max-quantized-colors", type=int, default=180, help="Max quantized color buckets for flat/cel finish heuristic")
+    p.add_argument("--max-local-gradient", type=float, default=0.035, help="Max local gradient for flat/cel finish heuristic")
+    p.add_argument("--fail-over-render", action="store_true", help="Make finish heuristics fail instead of warn")
     return p
 
 
