@@ -83,7 +83,7 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 | **unity-graphics** | Takes a flat/primitive scene to a premium look: URP setup, mobile lighting (baked + probes), materials/shaders, post-processing, and draw-call/overdraw budgets. |
 | **unity-aaa-graphics** | Visual-quality enforcement layer. Turns flat/"programmer-art" scenes into premium, store-quality visuals: art-direction critique, a mandatory per-surface asset-sourcing decision (generate real art for terrain, paths, units, props — not flat fills), an AAA prompt library with genre art kits, render polish, and a visual scorecard that fails amateur output. |
 | **unity-art-direction** | The art-direction *system*: a locked machine-readable `art-spec.yaml` single-source-of-truth, a 12-preset style library (concrete starting points), mobile art budgets (tri/texture/material caps), and a disciplined golden-asset → family production pipeline (concept → turnaround → 3D → cleanup → prefab → validation-scene → quality-gate scoring) so you ship an art-directed *game*, not a folder of pretty assets. |
-| **unity-asset-pipeline** | The production gate between generated source art and game-ready runtime prefabs: per-asset `asset-contract.yaml`, sprite/mesh/import QA, contract-driven Unity import, prefab factory, BeautyCell visual-regression screenshot, and an approved-asset registry that scene builders must use instead of raw generated files. |
+| **unity-asset-pipeline** | The production gate between generated source art and game-ready runtime prefabs: per-asset `asset-contract.yaml`, sprite/mesh/import/vision QA, contract-driven Unity import, Import Presets/AssetPostprocessor defaults, SpriteAtlas/Addressables metadata, prefab factory, BeautyCell visual-regression screenshot, and an approved-asset registry that scene builders must use instead of raw generated files. |
 | **unity-scene-composition** | Screen-space visual hierarchy beyond grid/layout correctness: camera profile, layers, focal path, big/medium/small shape rhythm, prop density, color zoning, occlusion budget, shadow/contact rules, and screenshot acceptance for BeautyCell/golden screens. |
 | **unity-game-layout** | Board/grid/world-coordinate discipline for mechanically correct levels: coordinate systems, tile/cell sizing, path/board geometry, placement constraints, and validation of gameplay layout before visual composition. |
 | **unity-animation** | Makes assets *move* — AAA, gameplay-synced animation via 2D sprite sheets or 3D skeletal (Tripo) rigs. Per-role clip catalog (idle/move/attack/hit/death; tower idle/aim/fire), Unity Animator/state-machine/blend-tree wiring, and Animation Events that fire gameplay on the right frame (release the arrow on the loose frame). A static asset where motion is expected fails the bar. |
@@ -262,7 +262,7 @@ Claude (via `unity-game-director`) will roughly:
 
 You stay in control — review each phase, redirect, or ask for changes.
 
-See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results.
+See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results. Maintainers can use **[External benchmark workflow](docs/EXTERNAL_BENCHMARK_WORKFLOW.md)** to periodically fold popular/official Unity production practices back into the skills.
 
 ### Designing for quality, retention & monetization
 
@@ -271,6 +271,7 @@ See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results
 - **Motion → Tripo, static → Gemini.** Produce anything that animates (characters, enemies, towers) with Tripo3D (rig + animate; pre-rendered to sprite frames for 2D) — Gemini is for static art, textures, UI, and reference images. Frame-by-frame image generation drifts.
 - **Treat generated art as source, not final assets.** Promote source files through `unity-asset-pipeline`: preserve/validate alpha, enforce import settings, generate prefabs, record BeautyCell screenshots, and enter only approved prefabs into the registry.
 - **Compose before scaling.** Use `unity-scene-composition` to build one BeautyCell/golden screen before generating dozens of assets; fix camera, scale, focal path, density, and color zoning there first.
+- **Adopt proven Unity production gates.** The asset pipeline now tracks SpriteAtlas groups, Import Presets/AssetPostprocessor defaults, optional Addressables labels, and optional URP 2D secondary textures so popular Unity best practices become contract fields and validators, not tribal memory.
 - **Design for hybrid monetization (ads + IAP).** Only ~1.8% of players ever buy an IAP, so rewarded/interstitial ads carry most casual revenue — plan both, not one.
 - **Instrument retention (D1/D7/D30) and tune via remote config / A/B testing** rather than guessing. The `unity-analytics-liveops` skill covers the funnels, SDKs, and experiments.
 
@@ -300,7 +301,8 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
 ├── .env.example
 ├── .gitignore
 ├── docs/
-│   └── PROMPTING.md
+│   ├── PROMPTING.md
+│   └── EXTERNAL_BENCHMARK_WORKFLOW.md
 └── skills/
     ├── unity-game-director/
     ├── unity-mcp-bridge/

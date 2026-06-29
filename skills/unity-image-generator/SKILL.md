@@ -258,7 +258,8 @@ return "imported sprite";
 Then:
 - **Sprites in scene:** `manage_gameobject` with a `SpriteRenderer`, assign the sprite.
 - **UI:** UI Toolkit (background-image in USS) via `manage_ui`, or uGUI `Image` via `manage_gameobject`+`manage_components`. See `unity-ui-designer`.
-- **Atlas:** group related sprites into a **Sprite Atlas** to cut draw calls (big win on mobile). Create the atlas asset and add the folder.
+- **Atlas:** group related sprites into a **Sprite Atlas** by family/layer/use-case to cut texture swaps/draw calls (big win on mobile). In production this is not optional metadata: record `atlas_group` / `sprite_atlas` in the `unity-asset-pipeline` asset contract and validate membership before approval.
+- **Import defaults:** for real projects, prefer Unity Import Presets + an `AssetPostprocessor` for sprite/tile/UI folders so TextureImporter settings are defaults rather than something every agent must remember. The contract/import validator still remains the gate.
 
 ## Quality & mobile rules
 

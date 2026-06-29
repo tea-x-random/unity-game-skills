@@ -189,3 +189,120 @@ public static class CompareReferenceFrames
 ## 6) BakeModelToAtlas pattern
 
 For pre-rendered 3D → 2D sprites, create a bake scene with one camera, one lighting rig, one material profile, transparent clear color, and a turntable/animation sampler. Output to PNG atlas; then run `validate_sprite.py --require-alpha` and import with `SpriteImportMode.Multiple`.
+
+## 7) Import presets + AssetPostprocessor (make correct import the default)
+
+Do not rely on each agent remembering import settings. Create project presets such as:
+
+```
+Assets/Art/ImportPresets/Sprite_Foreground.preset
+Assets/Art/ImportPresets/Sprite_BackgroundTile.preset
+Assets/Art/ImportPresets/UI_Icon.preset
+Assets/Art/ImportPresets/Texture_TilingMaterial.preset
+```
+
+Then use an `AssetPostprocessor` to route imports by folder/contract. The postprocessor should apply the preset first, then override contract-specific values (PPU, max size, platform format, secondary textures, atlas group metadata). Pattern:
+
+```csharp
+using UnityEditor;
+
+public sealed class ArtAssetPostprocessor : AssetPostprocessor
+{
+    void OnPreprocessTexture()
+    {
+        if (!assetPath.StartsWith("Assets/Art/")) return;
+        var ti = (TextureImporter)assetImporter;
+
+        if (assetPath.Contains("/Tiles/") || assetPath.Contains("/Background/"))
+        {
+            ti.textureType = TextureImporterType.Default;
+            ti.wrapMode = UnityEngine.TextureWrapMode.Repeat;
+            ti.mipmapEnabled = true;
+        }
+        else if (assetPath.Contains("/Sprites/") || assetPath.Contains("/Approved/"))
+        {
+            ti.textureType = TextureImporterType.Sprite;
+            ti.alphaIsTransparency = true;
+            ti.mipmapEnabled = false;
+            ti.spritePixelsPerUnit = 100;
+        }
+    }
+}
+```
+
+A preset/postprocessor is not a substitute for validation; it reduces drift. The import validator still compares realized settings to the contract.
+
+## 8) SpriteAtlas membership gate
+
+Sprite atlases are a production gate for 2D mobile: sprites are grouped by family/layer/use-case so batching and memory behavior are predictable. Add `atlas_group` and `sprite_atlas` to each contract. Before approval, verify the sprite is packed into the expected atlas.
+
+Suggested grouping:
+
+- `Characters_Hero.spriteatlas`
+- `Characters_Enemies.spriteatlas`
+- `Environment_Midground.spriteatlas`
+- `Environment_BackgroundTiles.spriteatlas`
+- `UI_Icons.spriteatlas`
+- `VFX_Particles.spriteatlas`
+
+Editor pattern:
+
+```csharp
+using UnityEditor;
+using UnityEditor.U2D;
+using UnityEngine.U2D;
+
+public static class AtlasGate
+{
+    public static void AddToAtlas(string atlasPath, string assetPath)
+    {
+        var atlas = AssetDatabase.LoadAssetAtPath<SpriteAtlas>(atlasPath);
+        var asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(assetPath);
+        if (atlas == null || asset == null) throw new System.Exception("Missing atlas or asset");
+        atlas.Add(new[] { asset });
+        EditorUtility.SetDirty(atlas);
+        AssetDatabase.SaveAssets();
+    }
+}
+```
+
+The BeautyCell can then use Frame Debugger/rendering stats to confirm the atlas grouping actually reduces texture swaps/draw calls.
+
+## 9) Addressables labels (asset registry -> runtime loading)
+
+If the project uses Addressables, the asset registry should map directly to Addressable groups/labels. The contract fields:
+
+```yaml
+addressables:
+  address: art/environment/meadow_tree_a
+  group: Art_Environment
+  labels: [art, environment, meadow_vegetation]
+```
+
+Gate before approval:
+
+- Addressable entry exists for `runtime.prefab`.
+- Address matches contract.
+- Group matches contract.
+- Labels include family + role.
+- Addressables Analyze has no blocking errors.
+
+## 10) Secondary textures for 2D lighting
+
+If the game uses URP 2D Renderer / Sprite-Lit materials, contracts must record secondary textures:
+
+```yaml
+secondary_textures:
+  normal_map: Assets/Art/Approved/tree/tree_n.png
+  mask_map: Assets/Art/Approved/tree/tree_mask.png
+```
+
+Gate before approval:
+
+- secondary textures exist when the material profile requires them;
+- normal map imported as NormalMap;
+- mask map imported as Default/linear as appropriate;
+- SpriteRenderer material/shader matches the material profile;
+- BeautyCell LightingTest proves the asset reacts consistently to the shared 2D lights.
+
+Do not generate normal/mask maps for a flat unlit style unless the art-spec says the style uses 2D lighting; this is a capability gate, not a universal requirement.

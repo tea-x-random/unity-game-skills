@@ -39,11 +39,21 @@ runtime:
   material_profile: World_Stylized_v1
   material_path: Assets/Materials/World_Stylized_v1.mat
   shader_keywords: []
+  secondary_textures:              # for URP 2D lights / Sprite-Lit materials when used
+    normal_map: null               # e.g. Assets/Art/Approved/meadow_tree_a/meadow_tree_a_n.png
+    mask_map: null                 # e.g. Assets/Art/Approved/meadow_tree_a/meadow_tree_a_mask.png
   shadow_profile: soft_blob_v1     # none | soft_blob_v1 | realtime | baked_contact
   sorting_layer: Gameplay
+  sorting_order_offset: 0
   render_queue: null
+  atlas_group: environment_midground_v1
+  addressables:
+    address: art/environment/meadow_tree_a
+    group: Art_Environment
+    labels: [art, environment, meadow_vegetation]
 
 import:
+  import_preset: Assets/Art/ImportPresets/Sprite_Foreground.preset
   texture_type: Sprite             # Sprite | Default | NormalMap | GUI
   sprite_mode: Single              # Single | Multiple
   sprite_mesh_type: Tight          # Tight | FullRect
@@ -54,6 +64,8 @@ import:
   compression: NormalQuality
   ios_format: ASTC_6x6
   android_format: ASTC_6x6
+  sprite_atlas: Assets/Art/Atlases/Environment_Midground.spriteatlas
+  addressable: true
   readable: false
 
 camera_contract:
@@ -94,7 +106,10 @@ qa:
   import_report: Assets/Art/Approved/meadow_tree_a/import-qa.json
   scale_valid: false
   material_valid: false
+  secondary_textures_valid: false
   collider_valid: false
+  atlas_valid: false
+  addressables_valid: false
   palette_valid: false
   scene_test_valid: false
   beauty_cell_screenshot: Assets/Art/Approved/meadow_tree_a/BeautyCell_01.png

@@ -78,9 +78,11 @@ Exit code 0 = contract valid and all referenced QA passed; non-zero = rejected (
 
 ## Apply the contract in Unity + build the prefab
 
-Run inside Unity via `unity-mcp-bridge` `execute_code`. Two steps, both in `references/editor-asset-pipeline.md`:
-1. **ApplyAssetContract** — set TextureImporter/ModelImporter to the contract's PPU, pivot, sprite mode, filter, mipmaps, max size, ASTC, and material profile, then validate the realized import matches the contract (the **import validator** — pivot, PPU, sprite mesh mode, compression, max texture size, mipmaps, material/shader assignment).
+Run inside Unity via `unity-mcp-bridge` `execute_code` or promoted Editor scripts. Key steps live in `references/editor-asset-pipeline.md`:
+1. **ApplyAssetContract** — set TextureImporter/ModelImporter to the contract's PPU, pivot, sprite mode, filter, mipmaps, max size, ASTC, material profile, and optional secondary textures, then validate the realized import matches the contract (the **import validator** — pivot, PPU, sprite mesh mode, compression, max texture size, mipmaps, material/shader assignment).
 2. **GeneratePrefabFromContract** — instantiate, attach the contract's collider + shared material + shadow profile, set pivot, save the prefab to `runtime.prefab`, and stamp the contract path on a small `AssetContractTag` component.
+3. **Atlas/Addressables gates** — if the asset is a sprite, put it in its contract's `sprite_atlas`/`atlas_group`; if the project uses Addressables, assign the contract address/group/labels.
+4. **Import automation** — for real projects, use Unity Import Presets + `AssetPostprocessor` so correct settings are defaults, not manual reminders; validation still verifies the result.
 
 The import validator is a **gate**, not a reminder: if the realized import settings do not match the contract, fail and do not produce a prefab.
 
@@ -119,4 +121,8 @@ Use **Tripo** (`unity-3d-generator`) or deliberately simple authored geometry fo
 - It does not lay out scenes / decide focal points & density → `unity-scene-composition`.
 - It does not own the final URP render lock → `unity-graphics`.
 
-It owns the contract, the validators, the prefab factory, the beauty-cell gate, and the registry — the bridge from "AI-generated assets in Unity" to "a coherent game art pipeline".
+It owns the contract, the validators, the prefab factory, atlas/addressables metadata, the beauty-cell gate, and the registry — the bridge from "AI-generated assets in Unity" to "a coherent game art pipeline".
+
+## Keep this skill current
+
+When the user asks to benchmark or improve the skills from popular Unity/game-art workflows, use `docs/EXTERNAL_BENCHMARK_WORKFLOW.md`. Promote only high-signal findings into contract fields, validators, Editor snippets, or skill rules. Current benchmark-derived gates here include SpriteAtlas groups, Import Presets/AssetPostprocessor, Addressables labels, and optional 2D secondary textures.

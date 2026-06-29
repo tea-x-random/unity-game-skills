@@ -17,12 +17,21 @@ assets:
     style_id: cozy_toy_diorama_v1
     composition_layer: midground
     visual_weight: medium
+    atlas_group: environment_midground_v1
+    sprite_atlas: Assets/Art/Atlases/Environment_Midground.spriteatlas
+    addressables:
+      address: art/environment/meadow_tree_a
+      group: Art_Environment
+      labels: [art, environment, meadow_vegetation]
     qa:
       alpha_valid: true
       import_valid: true
       scale_valid: true
       material_valid: true
+      secondary_textures_valid: true
       palette_valid: true
+      atlas_valid: true
+      addressables_valid: true
       scene_test_valid: true
       visual_regression_valid: true
     screenshots:
