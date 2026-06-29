@@ -1,6 +1,6 @@
-# Pre-render 3D → 2D sprites (Unity, via unity-mcp-bridge)
+# Pre-render 3D → non-pixel 2D sprites (Unity, via unity-mcp-bridge)
 
-Render a Tripo-generated model from the game camera into transparent PNG sprites — for static sprites, sprite-sheet animation frames, or N-direction rotation sets. Run through `execute_code` after the model is imported and a prefab/instance exists.
+Render a Tripo-generated model from the game camera into transparent PNG sprites for **non-pixel** static sprites, sprite-sheet animation frames, or N-direction rotation sets. Run through `execute_code` after the model is imported and a prefab/instance exists. For pixel-art final assets, do **not** render 3D and downscale; use `unity-pixel-art` / PixelLab instead.
 
 ## Camera + lighting setup (match the game's angle)
 - **Orthographic camera** (no perspective distortion for 2D), `clearFlags = SolidColor`, `backgroundColor` with **alpha 0** for transparency.
@@ -49,6 +49,6 @@ for (int d = 0; d < 8; d++) { target.transform.rotation = UnityEngine.Quaternion
 
 ## Tips
 - Keep the camera ortho size + distance **identical** across all frames/angles so sprites align.
-- Render at 2× the on-screen size, then let ASTC/mip handle downscale for crispness.
+- Render at 2× the on-screen size, then let ASTC/mip handle downscale for non-pixel crispness. This is not a pixel-art workflow.
 - Pack the resulting frames into a **Sprite Atlas** (mobile draw calls).
-- Match render lighting to `art-spec.yaml` so pre-rendered sprites sit in the same world as Gemini-generated 2D (UI, textures).
+- Match render lighting to `art-spec.yaml` so pre-rendered sprites sit in the same world as Gemini-generated 2D (UI, textures). Pixel-art sprites instead follow the `unity-pixel-art` import/profile contract.

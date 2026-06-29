@@ -1,6 +1,6 @@
 ---
 name: unity-asset-pipeline
-description: "Turn generated source art (Gemini images, Tripo meshes) into APPROVED, runtime-ready Unity asset packages with a machine-readable contract, enforced import settings, a generated prefab, validation gates, and an approved-asset registry. Use whenever assets must move from 'a file was generated' to 'an approved prefab that belongs in THIS game': per-asset asset-contract.yaml (id, family, role, style_id, source, runtime prefab/pivot/PPU/collider/material, camera_contract, qa flags), the asset manifest + validation gate (alpha/scale/palette/import/screenshot), the prefab factory (apply contract -> import settings -> prefab), the BeautyCell visual-regression gate, and the approved-asset registry that scene-building agents must use instead of dragging raw generated files into gameplay scenes. Triggers on: asset contract, asset manifest, runtime asset package, import validator, import contract, prefab factory, apply asset contract, generate prefab from contract, asset registry, approved asset, beauty cell, visual regression, golden screen, sprite bake, pre-render to atlas, 'why do my assets fall apart when assembled', game-ready import. Pairs with unity-art-direction (art-spec.yaml SSOT + families), unity-image-generator (2D source + sprite QA), unity-3d-generator (3D source + pre-render), unity-scene-composition (placement contract), and unity-graphics (URP render lock)."
+description: "Turn generated source art (Gemini images, PixelLab pixel sprites, Tripo meshes) into APPROVED, runtime-ready Unity asset packages with a machine-readable contract, enforced import settings, a generated prefab, validation gates, and an approved-asset registry. Use whenever assets must move from 'a file was generated' to 'an approved prefab that belongs in THIS game': per-asset asset-contract.yaml (id, family, role, style_id, source, runtime prefab/pivot/PPU/collider/material, camera_contract, qa flags), the asset manifest + validation gate (alpha/scale/palette/import/screenshot), the prefab factory (apply contract -> import settings -> prefab), the BeautyCell visual-regression gate, and the approved-asset registry that scene-building agents must use instead of dragging raw generated files into gameplay scenes. Triggers on: asset contract, asset manifest, runtime asset package, import validator, import contract, prefab factory, apply asset contract, generate prefab from contract, asset registry, approved asset, beauty cell, visual regression, golden screen, sprite bake, pre-render to atlas, 'why do my assets fall apart when assembled', game-ready import. Pairs with unity-art-direction (art-spec.yaml SSOT + families), unity-pixel-art (pixel-native final sprites/sheets), unity-image-generator (Gemini concept/static non-pixel source + sprite QA), unity-3d-generator (3D source + non-pixel pre-render), unity-scene-composition (placement contract), and unity-graphics (URP render lock)."
 ---
 
 # Unity asset pipeline
@@ -16,7 +16,7 @@ This skill is downstream of `unity-art-direction` (which owns the locked `art-sp
 ```
 art contract (art-spec.yaml + AssetBrief, owned by unity-art-direction)
   → family reference pack          (golden asset first; see "Families" below)
-  → source generation              (Gemini image / Tripo mesh)
+  → source generation              (PixelLab pixel sprite / Gemini image / Tripo mesh)
   → cleanup / alpha / mesh normalize (sprite QA or mesh-cleanup checklist)
   → asset-contract.yaml            (the machine-readable runtime contract)
   → Unity import validation        (ApplyAssetContract + import validator)
@@ -37,7 +37,7 @@ family: meadow_vegetation
 role: midground_obstacle
 style_id: cozy_toy_diorama_v1        # MUST match art-spec.yaml style_id
 source:
-  generator: tripo                   # tripo | gemini | authored
+  generator: pixellab                # pixellab | tripo | gemini | authored
   prompt_hash: "sha256:..."
   reference_pack: meadow_family_v1
 runtime:
@@ -111,14 +111,16 @@ Before generating dozens of assets, require ONE polished, screen-sized test scen
 
 ## Generators are source-art suppliers, not final-asset suppliers
 
-Use **Gemini** (`unity-image-generator`) primarily for: concept boards, background paintings, decals, UI illustrations/icons, texture/source references, and whole-pack family sheets with shared visual DNA. Avoid using it as the default source for independent gameplay-facing foreground props.
+Use **PixelLab** (`unity-pixel-art`) for final **pixel-art** sprites, tilesets, icons, directional sheets, and animation strips. Gemini can explore silhouettes/style boards, but approved pixel assets must be generated at native canvas with anchor-first consistency and pixel import settings. Do not make pixel art by Tripo/3D downscale.
 
-Use **Tripo** (`unity-3d-generator`) or deliberately simple authored geometry for: characters, props that cast shadows, interactables, scenery needing consistent perspective, and anything near the player camera. For a 2D look, render those 3D assets through ONE shared Unity lighting/material pipeline into sprite atlases (**sprite bake** / pre-render — see `unity-3d-generator` pre-render pipeline and `references/sprite-bake.md`). This is what gives consistent light, perspective, and shadow direction across a 2D scene.
+Use **Gemini** (`unity-image-generator`) primarily for: concept boards, background paintings, decals, UI illustrations/icons, texture/source references, non-pixel static art, and whole-pack family sheets with shared visual DNA. Avoid using it as the default source for independent gameplay-facing foreground props when a pixel or 3D route is more appropriate.
+
+Use **Tripo** (`unity-3d-generator`) or deliberately simple authored geometry for: runtime 3D characters/props, non-pixel props that cast shadows, interactables, scenery needing consistent perspective, and anything near the player camera. For a non-pixel 2D look, render those 3D assets through ONE shared Unity lighting/material pipeline into sprite atlases (**sprite bake** / pre-render — see `unity-3d-generator` pre-render pipeline and `references/sprite-bake.md`).
 
 ## What this skill does NOT do
 
 - It does not pick the style or write `art-spec.yaml` → `unity-art-direction`.
-- It does not generate source art → `unity-image-generator` / `unity-3d-generator`.
+- It does not generate source art → `unity-pixel-art` / `unity-image-generator` / `unity-3d-generator`.
 - It does not lay out scenes / decide focal points & density → `unity-scene-composition`.
 - It does not own the final URP render lock → `unity-graphics`.
 

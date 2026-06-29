@@ -107,3 +107,22 @@ Potential future adaptation:
 - normalize generated sprite sheets for baseline/scale automatically;
 - generate tile masks/templates before image-to-image painting;
 - outpaint static background plates into parallax layers, then validate them with composition recede rules.
+
+## Tool-pattern finding: PixelLab + ai-game-sprite-generator
+
+Sources: https://www.pixellab.ai/docs and https://mcpmarket.com/tools/skills/ai-game-sprite-generator
+
+Useful transferable patterns implemented/adapted:
+
+```yaml
+finding_id: pixel_native_anchor_first_sprite_pipeline
+source_type: tool-pattern
+source_url: https://www.pixellab.ai/docs; https://mcpmarket.com/tools/skills/ai-game-sprite-generator
+popularity_signal: dedicated pixel-art generation API + public sprite-skill workflow pattern
+problem: Gemini exploration and Tripo downscales produce weak final in-game pixel art; frame/variant identity drifts
+practice: Gemini only for exploration, PixelLab for final pixel-native sprites, lock one anchor sprite first, derive variants/directions/animation from that anchor, validate palette/alpha/baseline/import
+pipeline_change: add unity-pixel-art skill, PixelLab helper script, PIXEL_LABS_API_KEY probe/env docs, and no-3D-downscale routing rules across art/animation/director skills
+skill_targets: [unity-pixel-art, unity-image-generator, unity-animation, unity-art-direction, unity-asset-pipeline, unity-game-director]
+acceptance_gate: pixel asset manifest exists; sprite QA passes; import uses Point/no compression/no mipmaps/correct PPU; BeautyCell screenshot proves readability; no final pixel asset source is a downscaled 3D render
+status: implemented
+```

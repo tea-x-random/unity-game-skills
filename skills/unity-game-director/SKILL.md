@@ -73,9 +73,10 @@ can still author a complete, openable project from files alone — do this inste
 
 Casual iOS games split into two asset pipelines. Route on the concept:
 
-- **2D casual** (match-3, puzzle, tappers, hyper-casual): lean on `unity-image-generator` (sprites, UI, backgrounds), Unity 2D (Sprite Renderer / Sprite Atlas), UI Toolkit or uGUI. The 3D generator is usually not needed.
+- **Pixel-art 2D casual** (native low-res sprites, tilesets, directional sheets, sprite animation): lean on `unity-pixel-art` (PixelLab final assets) + Unity 2D (Sprite Renderer / Sprite Atlas / Pixel Perfect Camera). Use `unity-image-generator` only for Gemini exploration/concepts. Do not route final pixel sprites through Tripo downscales.
+- **Non-pixel 2D casual** (match-3, puzzle, tappers, hyper-casual): lean on `unity-image-generator` (static sprites, UI, backgrounds), Unity 2D, UI Toolkit or uGUI. Use `unity-3d-generator` only for non-pixel pre-rendered actors/props when consistency/animation requires it.
 - **3D casual** (runner, stacking, .io, physics toys): lean on `unity-3d-generator` (Tripo text/image→3D, rigging, animation), URP mobile rendering.
-- **Mixed** projects load both.
+- **Mixed** projects load the relevant pixel / image / 3D generators.
 
 Load these sibling `SKILL.md` files before implementation for broad/premium work (try `../<name>/SKILL.md`, then `~/.claude/skills/<name>/SKILL.md`, then `~/.codex/skills/...`, then `~/.agents/skills/...`):
 
@@ -91,7 +92,7 @@ Load these sibling `SKILL.md` files before implementation for broad/premium work
 
 Load the asset generators before deciding "assets not needed" when the game has characters, enemies, props, sprites, backgrounds, icons, UI art, music, or SFX:
 
-- `unity-3d-generator/SKILL.md`, `unity-image-generator/SKILL.md`, `unity-audio-generator/SKILL.md`.
+- `unity-pixel-art/SKILL.md`, `unity-3d-generator/SKILL.md`, `unity-image-generator/SKILL.md`, `unity-audio-generator/SKILL.md`.
 
 **Phase ordering for foundations & design.** For a new or team project, establish `unity-project-setup` **first** — source control (.gitignore/LFS/meta-file discipline), folder + asmdef architecture, package management, versioning, secrets-per-env, and CI/CD basics — before scaffolding gameplay, so the engine-free Core asmdef and clean git history exist from day one. And route `unity-game-economy` in at **design/concept time alongside Step 2.x** (with the aesthetic north-star and novel-mechanic scoping): the economy & meta-progression — currencies, sources/sinks, progression pacing, reward schedules, IAP catalog — shape the core loop, so design them up front rather than bolting them on after a slice exists.
 
@@ -143,10 +144,10 @@ Before claiming a generator key is unavailable, run the credential probe and pas
 
 ```bash
 bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
-# -> TRIPO_API_KEY=SET|MISSING / GEMINI_API_KEY=SET|MISSING / ELEVENLABS_API_KEY=SET|MISSING
+# -> TRIPO_API_KEY=SET|MISSING / GEMINI_API_KEY=SET|MISSING / PIXEL_LABS_API_KEY=SET|MISSING / ELEVENLABS_API_KEY=SET|MISSING
 ```
 
-"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. The probe checks **both** `GEMINI_API_KEY` and `TRIPO_API_KEY` — for premium character/prop/animated assets, consider Tripo (including **pre-rendering Tripo models to sprites for 2D games**, see `unity-3d-generator` "Use Tripo for 2D games too"), don't default to Gemini-only 2D generation. **Motion → Tripo, static → Gemini:** produce any animated/moving asset with Tripo (rig + render-to-sprite for 2D); Gemini frame-by-frame drifts and is a fallback only when `TRIPO_API_KEY` is `MISSING`/quota-blocked.
+"Key unavailable" is not a valid skip reason unless the probe shows `MISSING`. The probe checks `GEMINI_API_KEY`, `PIXEL_LABS_API_KEY`, and `TRIPO_API_KEY`. **Pixel-art final assets → PixelLab (`unity-pixel-art`)**; Gemini is exploration/concept/reference only. **Non-pixel motion/3D → Tripo** (rig + animate; pre-render only for high-res/painterly 2D). Do not default to Gemini-only 2D generation, and never make pixel art by Tripo/3D downscale.
 
 **Real generated art is the DEFAULT for EVERY primary visible surface — not one hero asset.** Each surface the player actually looks at should be a real generated/sourced asset with evidence (a Tripo task ID + imported GLB/FBX path, or a generated sprite/texture path): the background/terrain/ground, the path/track, the player, enemies/obstacles, towers/units, signature props, and the key UI. A single generated hero amid untextured everything-else is NOT a premium scene.
 
@@ -169,8 +170,9 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 
 - `unity-gameplay-systems`: first playable slice, project/scene setup, C# (cache `GetComponent` in `Awake`; Input System not legacy `Input`; pooling; no allocations in `Update`; `[SerializeField] private`; asmdefs), entity/state systems, camera, controls, scoring, difficulty, game feel. 2D and 3D casual templates.
 - External asset sourcing: credential probe, generator skill loading, source decision, task IDs / output files or blocker evidence. Must complete before graphics is "done" for premium visual claims.
-- `unity-3d-generator`: Tripo text/image→3D, texture, auto-rig, animation, conversion, GLB/FBX → write into `Assets/`, import, configure import settings.
-- `unity-image-generator`: STATIC 2D art only — sprites, UI art, backgrounds, icons, textures, concepts, and high-quality reference images that condition Tripo (image-to-3D inputs). Anything ANIMATED / with motion routes to `unity-3d-generator` (Tripo rig + animate, pre-rendered to sprites for 2D) plus `unity-animation`, not frame-by-frame Gemini.
+- `unity-pixel-art`: PixelLab final pixel-native sprites, tilesets, directional sheets, icons, and animation strips; Gemini can explore concepts first, but final pixels come from PixelLab and import with Point/no compression/pixel-perfect settings.
+- `unity-3d-generator`: Tripo text/image→3D, texture, auto-rig, animation, conversion, GLB/FBX → write into `Assets/`, import, configure import settings; also non-pixel pre-rendered 2D when useful.
+- `unity-image-generator`: STATIC non-pixel 2D art and Gemini exploration — UI art, backgrounds, icons, textures, concepts, and high-quality reference images that condition Tripo or PixelLab. Pixel-art finals route to `unity-pixel-art`; non-pixel animated/motion assets route to `unity-3d-generator` plus `unity-animation`, not frame-by-frame Gemini.
 - `unity-audio-generator`: SFX, loops/music, UI sounds, voice/TTS → import as AudioClips.
 - `unity-graphics`: basic-looking scenes → URP setup, lighting, materials, mobile-safe post, visual quality.
 - `unity-aaa-graphics`: premium/AAA visual upgrades — art-direction critique, mandatory per-surface asset sourcing, AAA prompt library + genre art kits, render polish, and a visual scorecard gate that fails flat/programmer-art scenes. Route here for any "make it look good / premium / looks basic" request.
@@ -207,7 +209,7 @@ Track only what proves the outcome:
 - Novel-mechanic scope (if any): spec+worked-example agreed / make-or-break property + measured value / decomposed+unit-tested / forks surfaced
 - Aesthetic north-star: reference style / palette / type / mood + anti-target / latest rubric score
 - Sibling skills loaded: gameplay / graphics / ui / debug / qa (+ 3d/image/audio if used)
-- Credential probe: TRIPO / GEMINI / ELEVENLABS = SET|MISSING
+- Credential probe: TRIPO / GEMINI / PIXEL_LABS / ELEVENLABS = SET|MISSING
 - Asset sourcing: hero source + evidence (task id / file) or skip reason
 - Phases: gameplay / assets / graphics / ui / debug / qa = pending|done|skipped + evidence
 - Verification: compile clean / play-mode screenshot / core loop / tests / iOS readiness

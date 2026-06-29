@@ -14,14 +14,14 @@ variant_of: null                   # canonical asset id if this is a variant
 state: default                     # default | damaged | alternate | seasonal | reward | disabled
 
 source:
-  generator: tripo                 # tripo | gemini | authored | kitbash | vendor
+  generator: pixellab              # pixellab | tripo | gemini | authored | kitbash | vendor
   source_art: Assets/Art/Source/meadow_tree_a.png
   candidate_set: Assets/Art/QA/meadow_tree_a.candidates.json
   best_candidate_report: Assets/Art/QA/meadow_tree_a.best.json
   prompt_hash: "sha256:<hash-of-final-prompt-or-brief>"
   reference_pack: meadow_family_v1
   seed: null
-  model_version: null
+  model_version: null              # e.g. pixflux | bitforge | tripo model version
   license: project_owned
   notes: "Canonical tree for meadow vegetation family."
 
@@ -60,12 +60,12 @@ import:
   sprite_mode: Single              # Single | Multiple
   sprite_mesh_type: Tight          # Tight | FullRect
   alpha_is_transparency: true
-  filter_mode: Bilinear            # Point for pixel art
+  filter_mode: Point               # Point for pixel art; Bilinear for non-pixel rendered sprites
   mipmaps: false                   # false for 2D sprites/UI; true for tiling/material textures
   max_texture_size: 2048
-  compression: NormalQuality
-  ios_format: ASTC_6x6
-  android_format: ASTC_6x6
+  compression: None                # None/RGBA32 for pixel art; NormalQuality/ASTC for non-pixel sprites
+  ios_format: RGBA32               # RGBA32 for pixel art; ASTC_6x6 for non-pixel sprites
+  android_format: RGBA32           # RGBA32 for pixel art; ASTC_6x6 for non-pixel sprites
   sprite_atlas: Assets/Art/Atlases/Environment_Midground.spriteatlas
   extruded_atlas_manifest: null     # set for sheet/tile atlas exports from extrude_atlas.py
   addressable: true
@@ -114,6 +114,7 @@ qa:
   atlas_valid: false
   addressables_valid: false
   palette_valid: false
+  pixel_native_valid: false         # true when pixel-art assets were generated at native canvas, not downscaled
   scene_test_valid: false
   beauty_cell_screenshot: Assets/Art/Approved/meadow_tree_a/BeautyCell_01.png
   visual_regression_valid: false

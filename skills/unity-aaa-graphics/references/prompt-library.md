@@ -1,12 +1,12 @@
 # AAA prompt library — exemplar prompts & genre art kits
 
-One-line prompts produce one-line art. This library gives a reusable **prompt template**, **negative prompts**, a **refine loop**, and **genre art kits** with full exemplar prompts you can adapt as starting points. Use with `unity-image-generator` (2D/textures/tilesets/UI) and `unity-3d-generator` (models). Always condition on the project's style sheet from `unity-asset-designer` so assets stay on-model.
+One-line prompts produce one-line art. This library gives a reusable **prompt template**, **negative prompts**, a **refine loop**, and **genre art kits** with full exemplar prompts you can adapt as starting points. Use with `unity-pixel-art` (final pixel sprites/tiles/sheets), `unity-image-generator` (Gemini concepts/non-pixel 2D/textures/UI), and `unity-3d-generator` (models/non-pixel pre-render). Always condition on the project's style sheet from `unity-asset-designer` so assets stay on-model.
 
 > Replace every `[BRACKET]` with your project's own art-direction tokens (from the style guide). Keep the *structure*; vary the *tokens*.
 
 > **Style comes from the project, never from this library.** The tokens — including fidelity and finish — are the user's/style-guide's. "AAA" here means *intentional and cohesive*, **not** "high-detail." A flat, minimal, muted look done cohesively is premium; this library must serve it as readily as a glossy one. Do not let the examples below push a target toward more rendering than it wants.
 
-> **Source rule:** motion / animated / multi-angle assets → Tripo (rig + animate; for 2D, pre-render the cycles to sprite frames — see `unity-3d-generator` pre-render + `../../unity-animation/SKILL.md`). Gemini → static art, textures, UI, and the reference images that condition Tripo. Gemini frame-by-frame drifts and is a fallback only when the Tripo key is `MISSING`.
+> **Source rule:** pixel-art final assets → `unity-pixel-art` / PixelLab anchor-first. Gemini → exploration, static non-pixel art, textures, UI, and reference images. Non-pixel motion / animated / multi-angle assets → Tripo (rig + animate; for high-res/painterly 2D, pre-render cycles to sprite frames). Never make pixel art by downscaling 3D renders; Gemini frame-by-frame drifts and is fallback/concept only.
 
 ## The prompt template (anatomy)
 
@@ -93,7 +93,7 @@ Surfaces: **tiling ground texture**, **textured path/track**, **build-slot tiles
 
 > The classic TD amateur look = flat green fill + flat tan path + translucent square slots + one castle. Replace the **ground, path, and slots with real textures** and add **scatter props** first — that alone removes most of the MS-Paint read.
 
-> Acting assets need animation states, and the default is Tripo. Archer/tower: rig + idle/aim/fire cycles (for 2D, pre-render those cycles to sprite frames); a directly-generated 2D idle/aim/fire frame strip is the fallback (Tripo key `MISSING`). See `../../unity-animation/SKILL.md`. The fire clip must release the projectile on the loose frame via an Animation Event.
+> Acting assets need animation states. Pixel-art archer/tower: `unity-pixel-art` anchor-first idle/aim/fire sheets. Non-pixel archer/tower: Tripo rig + idle/aim/fire cycles (pre-render only for high-res/painterly 2D). Gemini strips are fallback/concept only. See `../../unity-animation/SKILL.md`. The fire clip must release the projectile on the loose frame via an Animation Event.
 
 Exemplar — tower:
 ```
@@ -112,7 +112,7 @@ transparent background, single tile centered, no text. NOT: flat translucent squ
 ```
 
 ### Endless runner / arcade (side or 3/4 view)
-Surfaces: **player character** (animated → Tripo rig with run/jump cycles, pre-rendered to sprites for 2D by default; directly-generated run/jump frames are the fallback when the Tripo key is `MISSING`), **obstacle set**, **collectibles**, **parallax background layers (3–4)**, **ground/track texture**, **VFX**, **HUD**.
+Surfaces: **player character** (pixel-art → `unity-pixel-art` anchor-first run/jump sheets; non-pixel animated → Tripo rig with run/jump cycles, pre-rendered only for high-res/painterly 2D), **obstacle set**, **collectibles**, **parallax background layers (3–4)**, **ground/track texture**, **VFX**, **HUD**.
 
 Exemplar — parallax background:
 ```

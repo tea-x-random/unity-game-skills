@@ -1,19 +1,21 @@
 ---
 name: unity-image-generator
-description: "Generate and edit STATIC 2D image assets for Unity casual games using Google's Gemini image API, then import them as sprites/textures/UI. Use for 2D casual games (match-3, puzzle, hyper-casual): static sprites, character/prop art, backgrounds, tile/ground art, tiling textures, UI panels, buttons, icons, logos, title/menu art, particle textures, and material/texture references. For ANIMATED/motion assets (characters, animated actors, multi-angle/turnaround, anything that needs smooth animation) prefer Tripo (unity-3d-generator) to rig + animate, and for 2D pre-render the rig to sprite frames — this skill's role there is producing the high-quality concept/reference images that condition those Tripo models (image-to-3D). Covers Unity 2D import: Sprite mode, pixels-per-unit, filtering, sprite atlas, and ASTC for iOS."
+description: "Generate and edit STATIC non-pixel 2D image assets for Unity casual games using Google's Gemini image API, then import them as sprites/textures/UI. Use for exploratory/concept art, style boards, non-pixel static sprites, backgrounds, tile/ground art, tiling textures, UI panels, buttons, icons, logos, title/menu art, particle textures, material/texture references, and high-quality image-to-3D references. For PIXEL ART final assets (low-res sprites, tilesets, directional sheets, animation strips), use unity-pixel-art/PixelLab instead; Gemini may only explore concepts. For non-pixel ANIMATED/motion assets prefer Tripo (unity-3d-generator) to rig + animate, then pre-render only for high-res/painterly 2D — never downscale 3D into pixel art. Covers Unity 2D import: Sprite mode, pixels-per-unit, filtering, sprite atlas, and ASTC for iOS."
 ---
 
 # Unity Image Generator
 
-Generate **static** 2D art with Gemini, then import it into Unity correctly for sprites, UI, or textures. This is the skill for **static 2D art, textures/grounds, backgrounds, UI/icons, and reference/concept images**. Anything that **moves** — characters, animated actors, multi-angle/turnaround assets, anything needing smooth animation — should be produced with **Tripo** (`unity-3d-generator`: rig + animate; for 2D, **pre-render the rig to sprite frames**), with Gemini providing the high-quality reference images that condition those Tripo models.
+Generate **static non-pixel** 2D art with Gemini, then import it into Unity correctly for sprites, UI, or textures. This is the skill for **static 2D concepts, non-pixel textures/grounds, backgrounds, UI/icons, and reference images**. For **pixel art final assets**, route to `unity-pixel-art` (PixelLab) after Gemini exploration. Anything that **moves** in a non-pixel/high-res 2D style can be produced with **Tripo** (`unity-3d-generator`: rig + animate; pre-render to sprite frames), with Gemini providing the high-quality references that condition those Tripo models.
 
-## Gemini vs Tripo — pick the right tool (library-wide rule)
+## Gemini vs PixelLab vs Tripo — pick the right tool (library-wide rule)
 
-> **Motion → Tripo, static → Gemini.** This is the canonical, library-wide policy.
+> **Pixel art → PixelLab final. Non-pixel static/concept → Gemini. Non-pixel 3D/motion → Tripo.**
 
-- **Anything that needs motion, smooth animation, multiple poses, or turnaround consistency → Tripo** (`unity-3d-generator`): rig + animate, and for **2D games render the rig to sprite frames** (see `unity-3d-generator` → "Use Tripo for 2D games too" + `../unity-3d-generator/references/prerender-2d.md`, then `unity-animation`). One rigged, rendered model gives consistent identity across frames and angles and drift-free animation.
-- **Gemini (this skill) → static art:** concepts, tiling ground/textures, backgrounds, UI, icons, logos, and 2D art that doesn't move or need multiple angles — plus the **reference images that condition Tripo** (image-to-3D).
-- **Gemini frame-by-frame animation DRIFTS** (each independently generated frame loses identity) and is a **FALLBACK ONLY** — reach for it only when `TRIPO_API_KEY` is **MISSING**/quota-blocked, or when the motion is trivial.
+- **Pixel-art final assets → `unity-pixel-art` (PixelLab):** low-res sprites, tilesets, directional sheets, animation strips, icons, and any final asset that should read as deliberate pixel clusters. Gemini may explore references; it must not be the final pixel-art producer.
+- **Gemini (this skill) → exploration and static non-pixel art:** concepts, tiling ground/textures, backgrounds, UI, icons, logos, and high-quality reference images that condition Tripo or PixelLab.
+- **Non-pixel motion / high-res 2D pre-render → Tripo** (`unity-3d-generator`): rig + animate, then render to sprite frames for painterly/high-res 2D. This is **not** the pixel-art route.
+- **Never create pixel art by Tripo/3D → downscale.** Pixel art needs native canvas control, fixed palettes, crisp silhouettes, and anchor-first variants; use `unity-pixel-art`.
+- **Gemini frame-by-frame animation DRIFTS** (each independently generated frame loses identity) and is a fallback only for throwaway concepts or when both the pixel/3D final route is blocked.
 
 ## API key & script
 
@@ -65,8 +67,8 @@ export GEMINI_API_KEY="$(zsh -ic 'printf %s "$GEMINI_API_KEY"' | tail -1)"
 
 ## What to generate for casual games
 
-- **Sprites / characters / props:** request transparent background, single centered subject, consistent style, clean edges. For pixel art, ask for crisp pixels and a fixed palette.
-- **Sprite sheets:** request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell). For **animated assets, produce frames via Tripo rig + pre-render by DEFAULT** (`unity-3d-generator` pre-render → `unity-animation`) — one rigged model gives drift-free, consistent frames across states/angles. Direct Gemini per-state frame strips (idle/walk/attack) sliced by `unity-animation` are the **FALLBACK** only when Tripo is unavailable (`TRIPO_API_KEY` missing/quota-blocked) or the motion is trivial.
+- **Sprites / characters / props:** request transparent background, single centered subject, consistent style, clean edges. If the requested finish is **pixel art**, stop here after concept exploration and route final generation to `unity-pixel-art` / PixelLab.
+- **Sprite sheets:** for non-pixel assets, request an evenly-spaced grid of frames on transparent background; slice in Unity (Sprite Editor / Grid By Cell). For **pixel-art sheets**, use `unity-pixel-art` anchor-first PixelLab generation instead of Gemini strips or 3D downscales. For **non-pixel animated assets**, Tripo rig + pre-render remains the default when identity/angles matter.
 - **Backgrounds / parallax layers:** request seamless or full-bleed layers sized to portrait phone aspect (e.g. 1080×1920 framing).
 - **UI:** buttons, panels, frames, progress bars, currency/HUD icons, settings glyphs — flat, high-contrast, readable at small size, transparent background. Keep a consistent icon family.
 - **Logos / title art / app icon:** bold silhouette, legible at thumbnail size, no tiny text. The iOS app icon must be square with no transparency.
@@ -271,7 +273,7 @@ var ti = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath("Asset
 ti.textureType = UnityEditor.TextureImporterType.Sprite;     // Sprite (2D and UI)
 ti.spritePixelsPerUnit = 100;                                // match your world scale
 ti.spriteImportMode = UnityEditor.SpriteImportMode.Single;   // or .Multiple for sheets, then slice
-ti.filterMode = UnityEngine.FilterMode.Bilinear;             // Point for pixel art
+ti.filterMode = UnityEngine.FilterMode.Bilinear;             // For pixel art, route to unity-pixel-art and use Point
 ti.mipmapEnabled = false;                                    // off for UI/2D sprites
 // iOS compression
 var s = new UnityEditor.TextureImporterPlatformSettings {
@@ -299,6 +301,6 @@ Then:
 
 ## Field notes & lessons
 
-- **Policy: Motion → Tripo, static → Gemini.** Anything that moves or needs multiple poses/turnaround consistency goes through Tripo (rig + animate; pre-render to sprites for 2D) with Gemini supplying the reference images that condition it. Gemini is for static art, textures, grounds, backgrounds, UI/icons, and concept/reference images; its frame-by-frame animation drifts and is a fallback only when `TRIPO_API_KEY` is missing/quota-blocked.
+- **Policy: Pixel art → PixelLab final; static non-pixel/concept → Gemini; non-pixel motion/3D → Tripo.** Gemini is for static art, textures, grounds, backgrounds, UI/icons, and concept/reference images; PixelLab (`unity-pixel-art`) is for final pixel-native sprites/sheets; Tripo is for runtime 3D and high-res/painterly pre-rendered motion. Gemini frame-by-frame animation drifts and is fallback/concept only.
 - Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted non-Latin text needs a matching TMP font (default LiberationSans has no glyphs for many scripts) — fall back to a supported script until imported.
 - **Style-neutrality + per-axis measurement is the law here (learned the hard way, TWICE on one game).** Pass 1: a flat puzzle game generated from *injected* adjectives ("cozy storybook thick-ink, warm") → beautiful but wrong (heavy ink, painterly, dominant bg). Pass 2 *over-corrected* by sliding every axis to "light" (thin outline, muted, no shadow, no grid) → still wrong. Truth (measured): flat fill + **bold** dark-brown outline + white **sticker-halo** + **drop shadows** + **saturated** palette + **visible grid**. The lesson: (1) all style tokens come from the user/reference, never the skill's priors; (2) **style is multi-axis and the axes are INDEPENDENT — measure each separately by zooming + sampling pixels; never collapse to one "heavy/light" knob** ("flat" constrains only the fill); (3) counter-steer the model only on axes where the measured target differs; (4) validate **per-axis** side-by-side with the actual reference; (5) what the mock shows, the engine must render (the grid was mocked but never built). See "Match a reference" above.

@@ -1,7 +1,7 @@
 # Unity Game Skills
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Skills](https://img.shields.io/badge/skills-22-blue.svg)](#skill-catalog)
+[![Skills](https://img.shields.io/badge/skills-26-blue.svg)](#skill-catalog)
 [![Claude Code](https://img.shields.io/badge/for-Claude%20Code-8A2BE2.svg)](https://docs.claude.com/en/docs/claude-code)
 
 A collection of **[Claude Agent Skills](https://docs.claude.com/en/docs/claude-code/skills)** for building **casual iOS games in Unity 6** with Claude (Claude Code, the desktop app, or the Agent SDK). The skills drive a live Unity Editor through [MCP for Unity](https://github.com/CoplayDev/unity-mcp), generate 2D/3D/audio assets from text prompts, and carry battle-tested checklists for graphics, UI, gameplay, monetization, QA, and App Store release.
@@ -93,7 +93,8 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 
 | Skill | What it does | API |
 |-------|--------------|-----|
-| **unity-image-generator** | 2D sprites, sprite sheets, backgrounds, UI art, icons, particle/texture references → imported as Unity sprites/textures. | Google Gemini |
+| **unity-pixel-art** | Pixel-native final sprites, tilesets, icons, directional sheets, and animation strips using an anchor-first workflow → imported with Point/no-compression/pixel-perfect settings. | PixelLab |
+| **unity-image-generator** | Gemini exploratory/concept art, static non-pixel sprites, backgrounds, UI art, icons, particle/texture references → imported as Unity sprites/textures. | Google Gemini |
 | **unity-3d-generator** | Text-to-3D and image-to-3D game-ready GLB/FBX (characters, props, vehicles, obstacles), auto-rig + animation, low-poly/mobile optimization → imported via ModelImporter. | Tripo |
 | **unity-audio-generator** | SFX, looping ambience/music beds, UI sounds, and voice/TTS → imported as AudioClips with mobile-correct compression. | ElevenLabs |
 | **unity-asset-designer** | Art-direction layer *above* the generators: style guide / art bible, character turnaround sheets, and icon sets so all generated art stays on-model. No API key of its own. |
@@ -195,7 +196,7 @@ done
 
 Start Claude Code and ask: *"What Unity skills do you have?"* — it should list the `unity-*` skills. Or run `/help` and look for the skills section.
 
-You don't need all 25. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
+You don't need all 26. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
 ---
 
@@ -205,8 +206,9 @@ Only the **generative asset skills** need keys. Set them in your shell profile s
 
 | Variable | Used by | Get a key | Required? |
 |----------|---------|-----------|-----------|
-| `TRIPO_API_KEY` | `unity-3d-generator` | [platform.tripo3d.ai](https://platform.tripo3d.ai/) | Only for 3D generation |
-| `GEMINI_API_KEY` | `unity-image-generator` | [Google AI Studio](https://aistudio.google.com/apikey) | Only for 2D image generation |
+| `TRIPO_API_KEY` | `unity-3d-generator` | [platform.tripo3d.ai](https://platform.tripo3d.ai/) | Only for 3D generation / non-pixel pre-render |
+| `GEMINI_API_KEY` | `unity-image-generator` | [Google AI Studio](https://aistudio.google.com/apikey) | Only for Gemini exploration / non-pixel 2D image generation |
+| `PIXEL_LABS_API_KEY` | `unity-pixel-art` | [pixellab.ai/docs](https://www.pixellab.ai/docs) | Only for final pixel-art generation |
 | `ELEVENLABS_API_KEY` | `unity-audio-generator` | [elevenlabs.io](https://elevenlabs.io/) | Only for audio/voice generation |
 
 Copy [`.env.example`](.env.example) and fill in what you need, then export the values. The simplest reliable approach is to add them to your shell profile (`~/.zshrc` or `~/.zprofile` on macOS):
@@ -214,6 +216,7 @@ Copy [`.env.example`](.env.example) and fill in what you need, then export the v
 ```bash
 export TRIPO_API_KEY="your-tripo-key"
 export GEMINI_API_KEY="your-gemini-key"
+export PIXEL_LABS_API_KEY="your-pixellab-key"
 export ELEVENLABS_API_KEY="your-elevenlabs-key"
 ```
 
@@ -254,7 +257,7 @@ Claude (via `unity-game-director`) will roughly:
 2. Pin a tiny scope + aesthetic north-star, asking one batched round of questions if needed.
 3. Scaffold gameplay (`unity-gameplay-systems`) through MCP — input, spawning, scoring, game loop.
 4. Lock screen composition (`unity-scene-composition`) — camera, layers, focal path, density, color zones, and BeautyCell target.
-5. Generate source art if you have keys (`unity-3d-generator` for the fox/obstacles, `unity-image-generator` for UI/reference), or use procedural placeholders if not.
+5. Generate source art if you have keys (`unity-pixel-art` for final pixel sprites/sheets, `unity-3d-generator` for 3D or non-pixel pre-rendered actors, `unity-image-generator` for Gemini concepts/UI/reference), or use procedural placeholders if not.
 6. Promote generated files through `unity-asset-pipeline` — asset contracts, sprite/mesh/import QA, prefab factory, BeautyCell screenshot, and approved-asset registry.
 7. Build the HUD and game-over screen (`unity-ui-designer`).
 8. Polish visuals (`unity-graphics`).
@@ -268,7 +271,7 @@ See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results
 
 - **Ask for real generated art on every surface**, not flat placeholders — terrain, paths, units, and props should be sourced art, not solid fills. The `unity-aaa-graphics` skill enforces this with a per-surface asset-sourcing decision and a visual scorecard.
 - **Pin an art-direction north-star early** — palette, style, and finish (flat vs glossy) — so every asset and screen stays on-model instead of drifting.
-- **Motion → Tripo, static → Gemini.** Produce anything that animates (characters, enemies, towers) with Tripo3D (rig + animate; pre-rendered to sprite frames for 2D) — Gemini is for static art, textures, UI, and reference images. Frame-by-frame image generation drifts.
+- **Pixel art → PixelLab, Gemini → exploration, Tripo → 3D/non-pixel motion.** Final pixel sprites/sheets should be generated pixel-native with `unity-pixel-art` / PixelLab, not 3D renders downscaled into pixels. Gemini is for concepts, static non-pixel art, textures, UI, and reference images; Tripo is for runtime 3D and high-res/painterly pre-rendered actors.
 - **Treat generated art as source, not final assets.** Promote source files through `unity-asset-pipeline`: preserve/validate alpha, enforce import settings, generate prefabs, record BeautyCell screenshots, and enter only approved prefabs into the registry.
 - **Compose before scaling.** Use `unity-scene-composition` to build one BeautyCell/golden screen before generating dozens of assets; fix camera, scale, focal path, density, and color zoning there first.
 - **Adopt proven Unity production gates.** The asset pipeline now tracks SpriteAtlas groups, Import Presets/AssetPostprocessor defaults, optional Addressables labels, and optional URP 2D secondary textures so popular Unity best practices become contract fields and validators, not tribal memory.
@@ -317,6 +320,7 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-game-layout/
     ├── unity-animation/
     ├── unity-ui-designer/
+    ├── unity-pixel-art/
     ├── unity-image-generator/
     ├── unity-3d-generator/
     ├── unity-audio-generator/

@@ -58,23 +58,25 @@ Postprocess (texture / rig / animate / convert / stylize), rigging reliability r
 
 **Workflow:** generate a clean T-pose concept (`unity-image-generator`, or a T-pose turnaround from `unity-asset-designer`) → `image` to 3D → `prerigcheck` → rig → animate (preset/retarget cycles). If a rig fails, suspect the input pose first, regenerate a cleaner T-pose, and re-run — don't fight the rigger. Hold the character's *style/identity* constant (same prompt tokens) but swap the pose to neutral. (Props the character uses — bow, sword — are usually modeled/attached separately or kept to the side in the concept, not crossed over the body.)
 
-## Use Tripo for 2D games too — pre-rendered 3D → sprites
+## Use Tripo for non-pixel 2D pre-rendering — not for pixel art
 
-**Tripo is not only for 3D games.** Many premium-looking "2D" mobile games are actually **pre-rendered 3D**: generate a model with Tripo, then render it from the game camera to produce 2D sprites. For a 2D casual game this is often the *higher-quality* path than generating sprites directly, and it is under-used — reach for it whenever an asset needs multiple angles, animation frames, or a consistent premium finish.
+**Tripo is not only for runtime 3D games.** For high-res/painterly/illustrated "2D" mobile games, generate a model with Tripo, rig/animate it, then render it from the game camera to transparent sprites. Reach for this when a **non-pixel** asset needs multiple angles, animation frames, or a consistent premium rendered finish.
 
-Why pre-rendered 3D beats per-frame 2D generation:
-- **Consistency** — one model, lit once, renders identically every frame/angle. Generating each sprite or animation frame independently with an image model **drifts** (the character subtly changes); a rendered rig does not.
-- **Animation for free** — rig + animate once (Tripo), then render each frame of a cycle to a **sprite strip** with perfect identity. This is the premium way to get 2D character animation (pairs with `unity-animation`).
-- **Any angle** — render top-down, 3/4, side, or a full **8-direction** rotation set for top-down games from the same model.
-- **Baked depth/lighting/AO** — rendered sprites carry real form and shadow, not flat shading.
+**Do not use Tripo renders as the source of pixel art.** If the target finish is pixel art, route final generation to `unity-pixel-art` / PixelLab. Downscaling 3D destroys native pixel clusters, palette discipline, outline rules, and readable silhouettes.
+
+Why pre-rendered 3D beats per-frame non-pixel image generation:
+- **Consistency** — one model, lit once, renders identically every frame/angle. Generating each sprite or animation frame independently with an image model drifts; a rendered rig does not.
+- **Animation for free** — rig + animate once (Tripo), then render each frame of a cycle to a sprite strip with perfect identity.
+- **Any angle** — render top-down, 3/4, side, or an N-direction set from the same model.
+- **Baked depth/lighting/AO** — rendered sprites carry real form and shadow for non-pixel styles.
 
 ### Pipeline
-1. **Generate (and rig/animate) with Tripo** as above — even for a 2D game (e.g. the archer model + idle/aim/fire cycles).
-2. **Import into Unity**, set up an **orthographic camera + lighting that matches the game's angle** (top-down, 3/4, or side).
-3. **Render to PNG** with a transparent background — once for a static sprite, or **once per animation frame** (sample the Animator/clip at successive times) to build a sprite strip, or **once per rotation** for an N-direction set.
+1. **Generate (and rig/animate) with Tripo** for the non-pixel asset.
+2. **Import into Unity**, set up an orthographic camera + lighting matching the game's angle.
+3. **Render to PNG** with transparent background — static frame, animation frames, or rotations.
 4. **Import the rendered PNGs as sprites** (see `unity-image-generator` import settings: Sprite, ASTC, atlas) and animate via `unity-animation`.
 
-Compact render recipe (orthographic camera → transparent PNG) in `references/prerender-2d.md`. Use Gemini (`unity-image-generator`) for concepts, textures, tiling grounds, and UI; use Tripo + render for **characters, props, and animated actors** that need consistency, angles, or animation — in 2D *and* 3D games.
+Compact render recipe lives in `references/prerender-2d.md`. Use Gemini (`unity-image-generator`) for concepts, textures, tiling grounds, and UI; use Tripo + render for **non-pixel** characters/props/animated actors that need consistency; use `unity-pixel-art` for final pixel sprites.
 
 ## Prompt quality (game-ready, on-model)
 

@@ -30,6 +30,7 @@ assets:
       material_valid: true
       secondary_textures_valid: true
       palette_valid: true
+      pixel_native_valid: true
       atlas_valid: true
       addressables_valid: true
       scene_test_valid: true
