@@ -81,6 +81,7 @@ Load these sibling `SKILL.md` files before implementation for broad/premium work
 
 - `unity-mcp-bridge/SKILL.md` — always, it is the execution layer.
 - `unity-gameplay-systems/SKILL.md` — architecture, C#, Input System, scene/prefab assembly, 2D + 3D casual templates, game feel.
+- `unity-game-layout/SKILL.md` — **board/grid coordinate systems**: load whenever a game has a grid/board, pieces on tiles, tap-to-cell picking, isometric/2.5D/faux-perspective layout, depth sorting, or camera-fit/safe-area concerns. It owns the single-source-of-truth `CellToWorld`↔picking discipline; route any "pieces don't sit on tiles / taps hit the wrong cell / board misaligned" bug here.
 - `unity-graphics/SKILL.md` — URP mobile rendering, lighting, materials, perf-safe visuals.
 - `unity-ui-designer/SKILL.md` — UI Toolkit / uGUI, safe areas/notch, touch controls.
 - `unity-debug-profiler/SKILL.md` — console errors, domain-reload recovery, profiler, mobile perf.
