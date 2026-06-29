@@ -27,6 +27,13 @@ python3 ~/.claude/skills/unity-image-generator/scripts/generate_image.py \
 ```
 Flags: `--prompt/-p`, `--filename/-f` (write under `Assets/`), `--input-image/-i` (edit an existing image), `--resolution/-r {1K,2K,4K}`, `--api-key/-k`.
 
+**Alpha is preserved by default — never flatten foreground sprites onto white.** `generate_image.py` writes real PNG alpha unless you ask otherwise:
+- `--alpha-mode preserve` (default) — keep the model's RGBA verbatim. Use for sprites the model already returned with transparency.
+- `--alpha-mode chroma-key [--chroma-key-color magenta|cyan|r,g,b] [--chroma-key-threshold N]` — generate the subject on a solid matte, then key it to real alpha + autocrop + uniform pad. This is the reliable transparency path (see "Transparency" below).
+- `--alpha-mode opaque` — flatten onto white. ONLY for assets that must be opaque: the iOS app icon, full-bleed backgrounds, seamless tiling textures.
+
+> A prior version of this script always composited RGBA onto white, producing white-matted sprites and pale edge halos after import. That is fixed; do not reintroduce it. For any gameplay-facing foreground object, leave alpha-mode at `preserve` or use `chroma-key`, then run the validator gate below.
+
 ## Dependencies & quota gotchas (check these FIRST)
 
 The script needs `google-genai` and `pillow`. On modern macOS the system Python is
@@ -109,6 +116,41 @@ Reuse ONE measured token-set across the whole asset family. **Then validate PER-
 ## Transparency: Gemini fakes it — chroma-key instead
 
 Asking Gemini for a "transparent background" often yields a painted **checkerboard** (fully opaque) or a colored fill, not real alpha. Reliable path: generate the subject **alone on a solid chroma background** — magenta `RGB(255,0,255)` (use cyan if the subject itself is pink/red/magenta) — then key it out: sample the corner color, drop pixels within a distance threshold, cut alpha, and autocrop. (A reusable keyer pattern lives in the field notes / scratch scripts.)
+
+Recommended command for a foreground prop:
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/generate_image.py \
+  --prompt "single centered <SUBJECT>, solid magenta background, clean non-overlapping silhouette, no shadow baked into the matte, <STYLE TOKENS>" \
+  --filename Assets/Art/Source/meadow_tree_a.png \
+  --resolution 2K \
+  --alpha-mode chroma-key \
+  --chroma-key-color magenta
+```
+
+### Sprite QA gate — required before Unity import
+
+Run `validate_sprite.py` on every generated 2D foreground object before import. It writes a machine-readable QA report and exits non-zero on failure:
+
+```bash
+python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
+  Assets/Art/Source/meadow_tree_a.png \
+  --require-alpha \
+  --min-padding 4 \
+  --max-width 2048 --max-height 2048 \
+  --palette '#6FAE5A,#4F8A3E,#2D3A2A,#F5E6B8' \
+  --json-report Assets/Art/QA/meadow_tree_a.sprite-qa.json
+```
+
+Reject and regenerate/fix the asset if any of these fail:
+- **non-transparent corners** when transparency is required (painted checkerboard or matte background);
+- **white/green/blue/magenta/cyan edge halo** around the silhouette (flattened or poorly keyed matte);
+- **alpha bounding box too loose** or wildly inconsistent padding around the sprite;
+- **silhouette occupancy outside the target range** (tiny dot in a giant canvas, or cropped/clipped subject);
+- **resolution / texture-memory cap** exceeded for the intended device tier;
+- **palette distance** too far from the locked project palette.
+
+The Unity import gate should consume the JSON report as evidence; do not allow a generated foreground sprite into a runtime prefab without a passing alpha QA report.
 
 ## Environment & terrain textures (most-missed assets)
 

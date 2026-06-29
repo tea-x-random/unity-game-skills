@@ -13,6 +13,8 @@ This skill is the **system**: the locked spec, the style-preset catalog, the mob
 - **`unity-art-direction`** (here) — the `art-spec.yaml` SSOT, style presets, budgets, the golden-asset/family pipeline, quality gates.
 - **`unity-asset-designer`** — the on-model reference/turnaround/icon sheets craft that this pipeline's "approved multi-view" step calls for.
 - **`unity-aaa-graphics`** — per-surface "generate everything" sourcing, the AAA prompt library/genre kits, and the visual scorecard that fails amateur scenes.
+- **`unity-asset-pipeline`** — the hard gate from generated source art to approved runtime prefabs: asset contracts, import QA, prefab factory, BeautyCell screenshots, and the approved-asset registry.
+- **`unity-scene-composition`** — the screen-space composition contract: camera profile, layers, focal path, density, color zoning, occlusion, and screenshot acceptance.
 - **`unity-graphics`** — the URP render lock (lighting/material/post) that produces the final on-device look.
 
 ## Non-negotiable rules
@@ -26,7 +28,7 @@ This skill is the **system**: the locked spec, the style-preset catalog, the mob
 
 ## The art spec — single source of truth
 
-Before the first production asset, write and approve `Assets/GameArt/_ArtDirection/art-spec.yaml`. It captures `style_id`, `camera`, `shape_language`, `palette` (dominant/neutrals/accent + max high-chroma accents per asset), `materials`, `lighting`, `rendering` (shared shader family + post), `scale` (metric), `mobile_budget` (triangle/texture/material caps per tier + target fps), and `acceptance` gates. **Make intentional choices, then lock them** — don't leave values generic. Full template + an `AssetBrief` template + recommended mobile budgets: `references/art-spec-template.yaml`.
+Before the first production asset, write and approve `Assets/GameArt/_ArtDirection/art-spec.yaml`. It captures `style_id`, `camera`, `shape_language`, `palette` (dominant/neutrals/accent + max high-chroma accents per asset), `materials`, `lighting`, `rendering` (shared shader family + post), `scale` (metric), `mobile_budget` (triangle/texture budget, material caps per tier + target fps), and `acceptance` gates. Then write `Assets/GameArt/_ArtDirection/composition.yaml` with `unity-scene-composition` to lock camera profile, visual layers, focal path, density, color zoning, occlusion, and screenshot tests. **Make intentional choices, then lock them** — don't leave values generic. Full template + an `AssetBrief` template + recommended mobile budgets: `references/art-spec-template.yaml`.
 
 ## Choose a style preset
 
@@ -47,8 +49,9 @@ Avoid `cinematic_pbr_realism` on a solo iOS team unless the game is intentionall
 4. **Tripo 3D** — generate from the approved multi-view (text-to-3D only for fast exploration): one watertight object, clean silhouette, no floaters, simple readable forms, single UV set, within the tier's triangle/material budget, pivot at base center, Y-up, scaled to metric. (Use `unity-3d-generator`.) **Any asset whose AssetBrief declares animation/motion is produced via Tripo here (rig + animate; pre-render the rig to sprite frames for 2D), never frame-by-frame Gemini — that drifts and is a fallback only when `TRIPO_API_KEY` is missing.**
 5. **Mesh cleanup & Unity ingest** — AI geometry is never auto-production-ready (see checklist below).
 6. **Prefab with shared shader** — make a named prefab using the project's shared stylized material, in the standard directory.
-7. **ArtValidationScene** — render the prefab in all five standard framings (gameplay camera, neutral studio, bright outdoor, dim indoor, thumbnail/reward-card).
-8. **Quality gate** — score 0–2 per dimension; needs ≥10/12 and no zeros. Only then add to a gameplay scene.
+7. **Asset contract + prefab factory** — write `asset-contract.yaml` and run `unity-asset-pipeline`: validate source QA, apply import settings, generate the runtime prefab, and stamp contract provenance.
+8. **ArtValidationScene + BeautyCell** — render the prefab in all five standard framings (gameplay camera, neutral studio, bright outdoor, dim indoor, thumbnail/reward-card) and in `BeautyCell_01` using the locked `composition.yaml`.
+9. **Quality gate + registry** — score 0–2 per dimension; needs ≥10/12 and no zeros, all machine validators green, and a recorded screenshot. Only then add the prefab to the approved-asset registry. Scene builders may use only registry assets.
 
 ### Mesh cleanup & ingest checklist
 Mesh integrity (remove floaters, non-manifold, interior faces) · silhouette preserved from the game camera · metric scale + correct pivot · topology reduced where unseen + LODs as needed · materials reduced to the project shader grammar (don't keep random generated PBR maps) · textures compressed/sized to `mobile_budget` · primitive/simplified colliders (never a raw high-poly collision mesh) · named prefab in the standard directory.

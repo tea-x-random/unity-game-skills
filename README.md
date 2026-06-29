@@ -83,6 +83,9 @@ These skills are plain Markdown + a little Python/Bash — no build step, no dep
 | **unity-graphics** | Takes a flat/primitive scene to a premium look: URP setup, mobile lighting (baked + probes), materials/shaders, post-processing, and draw-call/overdraw budgets. |
 | **unity-aaa-graphics** | Visual-quality enforcement layer. Turns flat/"programmer-art" scenes into premium, store-quality visuals: art-direction critique, a mandatory per-surface asset-sourcing decision (generate real art for terrain, paths, units, props — not flat fills), an AAA prompt library with genre art kits, render polish, and a visual scorecard that fails amateur output. |
 | **unity-art-direction** | The art-direction *system*: a locked machine-readable `art-spec.yaml` single-source-of-truth, a 12-preset style library (concrete starting points), mobile art budgets (tri/texture/material caps), and a disciplined golden-asset → family production pipeline (concept → turnaround → 3D → cleanup → prefab → validation-scene → quality-gate scoring) so you ship an art-directed *game*, not a folder of pretty assets. |
+| **unity-asset-pipeline** | The production gate between generated source art and game-ready runtime prefabs: per-asset `asset-contract.yaml`, sprite/mesh/import QA, contract-driven Unity import, prefab factory, BeautyCell visual-regression screenshot, and an approved-asset registry that scene builders must use instead of raw generated files. |
+| **unity-scene-composition** | Screen-space visual hierarchy beyond grid/layout correctness: camera profile, layers, focal path, big/medium/small shape rhythm, prop density, color zoning, occlusion budget, shadow/contact rules, and screenshot acceptance for BeautyCell/golden screens. |
+| **unity-game-layout** | Board/grid/world-coordinate discipline for mechanically correct levels: coordinate systems, tile/cell sizing, path/board geometry, placement constraints, and validation of gameplay layout before visual composition. |
 | **unity-animation** | Makes assets *move* — AAA, gameplay-synced animation via 2D sprite sheets or 3D skeletal (Tripo) rigs. Per-role clip catalog (idle/move/attack/hit/death; tower idle/aim/fire), Unity Animator/state-machine/blend-tree wiring, and Animation Events that fire gameplay on the right frame (release the arrow on the loose frame). A static asset where motion is expected fails the bar. |
 | **unity-ui-designer** | Screenshot-proven mobile UI: HUDs, menus, pause/win/lose/settings screens, safe-area/notch handling, 44pt touch targets, TextMeshPro, uGUI and UI Toolkit. |
 
@@ -166,7 +169,7 @@ Available in every project on your machine:
 ```bash
 git clone https://github.com/tea-x-random/unity-game-skills.git
 mkdir -p ~/.claude/skills
-cp -R unity-game-director/skills/unity-* ~/.claude/skills/
+cp -R unity-game-skills/skills/unity-* ~/.claude/skills/
 ```
 
 ### Option B — install into a single project
@@ -176,7 +179,7 @@ Scoped to one repo (commit them with your game, or add to `.gitignore`):
 ```bash
 git clone https://github.com/tea-x-random/unity-game-skills.git
 mkdir -p /path/to/your-game/.claude/skills
-cp -R unity-game-director/skills/unity-* /path/to/your-game/.claude/skills/
+cp -R unity-game-skills/skills/unity-* /path/to/your-game/.claude/skills/
 ```
 
 ### Option C — symlink (stay up to date with `git pull`)
@@ -192,7 +195,7 @@ done
 
 Start Claude Code and ask: *"What Unity skills do you have?"* — it should list the `unity-*` skills. Or run `/help` and look for the skills section.
 
-You don't need all 22. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
+You don't need all 25. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
 ---
 
@@ -250,10 +253,12 @@ Claude (via `unity-game-director`) will roughly:
 1. Detect the Unity version and project capabilities.
 2. Pin a tiny scope + aesthetic north-star, asking one batched round of questions if needed.
 3. Scaffold gameplay (`unity-gameplay-systems`) through MCP — input, spawning, scoring, game loop.
-4. Generate assets if you have keys (`unity-3d-generator` for the fox/obstacles, `unity-image-generator` for UI), or use procedural placeholders if not.
-5. Build the HUD and game-over screen (`unity-ui-designer`).
-6. Polish visuals (`unity-graphics`).
-7. Run Play Mode and capture screenshots (`unity-qa-release` / `unity-debug-profiler`) as evidence it actually runs.
+4. Lock screen composition (`unity-scene-composition`) — camera, layers, focal path, density, color zones, and BeautyCell target.
+5. Generate source art if you have keys (`unity-3d-generator` for the fox/obstacles, `unity-image-generator` for UI/reference), or use procedural placeholders if not.
+6. Promote generated files through `unity-asset-pipeline` — asset contracts, sprite/mesh/import QA, prefab factory, BeautyCell screenshot, and approved-asset registry.
+7. Build the HUD and game-over screen (`unity-ui-designer`).
+8. Polish visuals (`unity-graphics`).
+9. Run Play Mode and capture screenshots (`unity-qa-release` / `unity-debug-profiler`) as evidence it actually runs.
 
 You stay in control — review each phase, redirect, or ask for changes.
 
@@ -264,6 +269,8 @@ See the **[Prompting guide](docs/PROMPTING.md)** for how to get the best results
 - **Ask for real generated art on every surface**, not flat placeholders — terrain, paths, units, and props should be sourced art, not solid fills. The `unity-aaa-graphics` skill enforces this with a per-surface asset-sourcing decision and a visual scorecard.
 - **Pin an art-direction north-star early** — palette, style, and finish (flat vs glossy) — so every asset and screen stays on-model instead of drifting.
 - **Motion → Tripo, static → Gemini.** Produce anything that animates (characters, enemies, towers) with Tripo3D (rig + animate; pre-rendered to sprite frames for 2D) — Gemini is for static art, textures, UI, and reference images. Frame-by-frame image generation drifts.
+- **Treat generated art as source, not final assets.** Promote source files through `unity-asset-pipeline`: preserve/validate alpha, enforce import settings, generate prefabs, record BeautyCell screenshots, and enter only approved prefabs into the registry.
+- **Compose before scaling.** Use `unity-scene-composition` to build one BeautyCell/golden screen before generating dozens of assets; fix camera, scale, focal path, density, and color zoning there first.
 - **Design for hybrid monetization (ads + IAP).** Only ~1.8% of players ever buy an IAP, so rewarded/interstitial ads carry most casual revenue — plan both, not one.
 - **Instrument retention (D1/D7/D30) and tune via remote config / A/B testing** rather than guessing. The `unity-analytics-liveops` skill covers the funnels, SDKs, and experiments.
 
@@ -302,6 +309,9 @@ A short version (full guide in **[docs/PROMPTING.md](docs/PROMPTING.md)**):
     ├── unity-graphics/
     ├── unity-aaa-graphics/
     ├── unity-art-direction/
+    ├── unity-asset-pipeline/
+    ├── unity-scene-composition/
+    ├── unity-game-layout/
     ├── unity-animation/
     ├── unity-ui-designer/
     ├── unity-image-generator/

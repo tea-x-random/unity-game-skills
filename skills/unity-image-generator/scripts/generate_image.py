@@ -19,6 +19,91 @@ import sys
 from pathlib import Path
 
 
+# Default solid background used when asking the model for a keyable matte.
+# Magenta is the safe default; switch to cyan when the subject itself is pink/red.
+CHROMA_DEFAULTS = {
+    "magenta": (255, 0, 255),
+    "cyan": (0, 255, 255),
+}
+
+
+def _parse_color(text):
+    """Parse 'r,g,b' or a named chroma key into an (r, g, b) tuple."""
+    if text in CHROMA_DEFAULTS:
+        return CHROMA_DEFAULTS[text]
+    parts = [p.strip() for p in text.split(",")]
+    if len(parts) != 3:
+        raise argparse.ArgumentTypeError(
+            f"Invalid color '{text}'. Use 'r,g,b' or one of {list(CHROMA_DEFAULTS)}."
+        )
+    return tuple(max(0, min(255, int(p))) for p in parts)
+
+
+def chroma_key(image, key_color, threshold=60, autocrop=True, pad=4):
+    """Cut a solid chroma background to real alpha.
+
+    Samples within ``threshold`` (Euclidean RGB distance) of ``key_color`` are
+    made transparent. Optionally autocrops to the opaque bounding box and adds
+    uniform transparent padding so every sprite in a family trims consistently.
+    """
+    from PIL import Image as PILImage
+
+    rgba = image.convert("RGBA")
+    px = rgba.load()
+    w, h = rgba.size
+    kr, kg, kb = key_color
+    thr_sq = threshold * threshold
+    for y in range(h):
+        for x in range(w):
+            r, g, b, a = px[x, y]
+            dr, dg, db = r - kr, g - kg, b - kb
+            if dr * dr + dg * dg + db * db <= thr_sq:
+                px[x, y] = (r, g, b, 0)
+    if autocrop:
+        bbox = rgba.getbbox()
+        if bbox:
+            rgba = rgba.crop(bbox)
+            if pad > 0:
+                padded = PILImage.new("RGBA", (rgba.width + 2 * pad, rgba.height + 2 * pad), (0, 0, 0, 0))
+                padded.paste(rgba, (pad, pad))
+                rgba = padded
+    return rgba
+
+
+def save_image(image, output_path, alpha_mode, key_color, threshold):
+    """Persist a generated PIL image as PNG under the chosen alpha policy.
+
+    alpha_mode:
+      - preserve   : keep the model's RGBA alpha verbatim (default).
+      - chroma-key : key out a solid chroma background to real alpha.
+      - opaque     : flatten onto white (legacy behavior; app icons, full-bleed bg).
+    """
+    from PIL import Image as PILImage
+
+    if alpha_mode == "chroma-key":
+        out = chroma_key(image, key_color, threshold=threshold)
+        out.save(str(output_path), "PNG")
+        return "chroma-key"
+
+    if alpha_mode == "opaque":
+        if image.mode == "RGBA":
+            flat = PILImage.new("RGB", image.size, (255, 255, 255))
+            flat.paste(image, mask=image.split()[3])
+            flat.save(str(output_path), "PNG")
+        else:
+            image.convert("RGB").save(str(output_path), "PNG")
+        return "opaque"
+
+    # preserve (default): never flatten alpha onto white.
+    if image.mode == "RGBA":
+        image.save(str(output_path), "PNG")
+    elif image.mode in ("LA", "PA", "P"):
+        image.convert("RGBA").save(str(output_path), "PNG")
+    else:
+        image.convert("RGB").save(str(output_path), "PNG")
+    return "preserve"
+
+
 def get_api_key(provided_key: str | None) -> str | None:
     """Get API key from argument first, then environment."""
     if provided_key:
@@ -53,6 +138,27 @@ def main():
     parser.add_argument(
         "--api-key", "-k",
         help="Gemini API key (overrides GEMINI_API_KEY env var)"
+    )
+    parser.add_argument(
+        "--alpha-mode",
+        choices=["preserve", "chroma-key", "opaque"],
+        default="preserve",
+        help=(
+            "PNG alpha handling. preserve keeps generated RGBA alpha (default); "
+            "chroma-key removes a solid key background; opaque flattens to white."
+        ),
+    )
+    parser.add_argument(
+        "--chroma-key-color",
+        type=_parse_color,
+        default=CHROMA_DEFAULTS["magenta"],
+        help="Color for --alpha-mode chroma-key: 'magenta', 'cyan', or 'r,g,b' (default: magenta).",
+    )
+    parser.add_argument(
+        "--chroma-key-threshold",
+        type=int,
+        default=60,
+        help="RGB distance threshold for --alpha-mode chroma-key (default: 60).",
     )
 
     args = parser.parse_args()
@@ -122,13 +228,16 @@ def main():
             )
         )
         
-        # Process response and convert to PNG
+        # Process response and save to PNG.
+        # IMPORTANT: preserve alpha by default. The previous implementation
+        # composited RGBA onto white, creating white-matted sprites and edge
+        # halos after Unity import.
         image_saved = False
         for part in response.parts:
             if part.text is not None:
                 print(f"Model response: {part.text}")
             elif part.inline_data is not None:
-                # Convert inline data to PIL Image and save as PNG
+                # Convert inline data to PIL Image and save as PNG.
                 from io import BytesIO
 
                 # inline_data.data is already bytes, not base64
@@ -139,16 +248,14 @@ def main():
                     image_data = base64.b64decode(image_data)
 
                 image = PILImage.open(BytesIO(image_data))
-
-                # Ensure RGB mode for PNG (convert RGBA to RGB with white background if needed)
-                if image.mode == 'RGBA':
-                    rgb_image = PILImage.new('RGB', image.size, (255, 255, 255))
-                    rgb_image.paste(image, mask=image.split()[3])
-                    rgb_image.save(str(output_path), 'PNG')
-                elif image.mode == 'RGB':
-                    image.save(str(output_path), 'PNG')
-                else:
-                    image.convert('RGB').save(str(output_path), 'PNG')
+                saved_mode = save_image(
+                    image=image,
+                    output_path=output_path,
+                    alpha_mode=args.alpha_mode,
+                    key_color=args.chroma_key_color,
+                    threshold=args.chroma_key_threshold,
+                )
+                print(f"Saved PNG with alpha-mode: {saved_mode}")
                 image_saved = True
         
         if image_saved:

@@ -1,0 +1,114 @@
+schema: unity-game-skills.composition.v1
+style_id: cozy_toy_diorama_v1
+camera_profile:
+  profile_id: gameplay_iso_ortho_v1
+  projection: orthographic
+  yaw: 45
+  pitch: 35
+  orthographic_size: 6.5
+  lens: null
+  target_aspect: portrait_9_19_5
+  target_resolution: [1170, 2532]
+  framing: hero_object_lower_third_with_play_path_centered
+  safe_area_margin_percent: 5
+
+visual_layers:
+  background:
+    z_range: [20, 50]
+    contrast: low
+    detail_density: low
+    saturation: low
+    may_occlude_gameplay: false
+  far:
+    z_range: [10, 20]
+    contrast: low
+    detail_density: low_medium
+    may_occlude_gameplay: false
+  midground:
+    z_range: [1, 10]
+    contrast: medium
+    detail_density: medium
+    may_occlude_gameplay: false
+  gameplay:
+    z_range: [-1, 1]
+    contrast: high
+    detail_density: controlled
+    may_occlude_gameplay: false
+  foreground:
+    z_range: [-10, -1]
+    contrast: medium
+    detail_density: low
+    max_occlusion_percent: 8
+  ui:
+    z_range: overlay
+    contrast: high
+    safe_area_required: true
+
+focal_path:
+  first_read: primary_gameplay_goal
+  second_read: next_action_or_reward
+  third_read: world_flavor
+  forbidden_first_reads: [background_detail, filler_props, decorative_vfx]
+
+shape_rhythm:
+  big_shapes_per_screen: [1, 2]
+  medium_shapes_per_screen: [3, 6]
+  small_shapes_per_screen: [6, 18]
+  min_silhouette_spacing_percent: 3
+  target_screen_height_percent:
+    hero: [22, 35]
+    primary_gameplay: [12, 22]
+    support_prop: [6, 16]
+    filler_prop: [2, 8]
+
+density_budget:
+  max_density_cost_per_screen: 24
+  max_interesting_objects_per_screen: 12
+  max_prop_families_per_screen: 4
+  quiet_zone_min_percent: 30
+
+color_zones:
+  gameplay_path:
+    saturation: medium_low
+    contrast: medium
+    reserved_accent_colors: []
+  rewards_and_interactables:
+    saturation: high
+    contrast: high
+    reserved_accent_colors: [accent_gold, accent_blue]
+  background:
+    saturation: low
+    contrast: low
+
+occlusion_budget:
+  gameplay_area_max_percent: 8
+  critical_path_max_percent: 0
+  ui_safe_area_max_percent: 0
+  foreground_allowed: true
+
+shadow_and_contact:
+  key_light_direction: upper_left
+  shadow_direction: lower_right
+  shadow_softness: soft
+  contact_darkening_strength: medium
+  blob_shadow_profile: soft_blob_v1
+
+family_distribution:
+  meadow_vegetation:
+    allowed_layers: [midground, foreground]
+    per_screen_count: [2, 5]
+    max_variants_visible: 3
+  meadow_rocks:
+    allowed_layers: [midground, gameplay]
+    per_screen_count: [1, 4]
+    max_variants_visible: 2
+
+screenshot_tests:
+  required_scenes: [BeautyCell_01, CameraScaleTest, LightingTest, MaterialTest, MobileDeviceTest]
+  required_aspects: [portrait_9_19_5, tablet_4_3]
+  acceptance:
+    gameplay_first_read: true
+    no_unapproved_assets: true
+    density_within_budget: true
+    occlusion_within_budget: true
+    camera_contracts_match: true
