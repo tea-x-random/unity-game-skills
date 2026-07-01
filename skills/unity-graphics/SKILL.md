@@ -39,6 +39,16 @@ Read `mcpforunity://project/info` and check `renderPipeline`.
 - If `renderPipeline` is empty/Built-in and you want URP: install `com.unity.render-pipelines.universal` (via `manage_packages`), create a URP asset + Universal Renderer, and assign it in Graphics + Quality settings. Do this through `execute_code` driving `UniversalRenderPipelineAsset` + `GraphicsSettings.defaultRenderPipeline`, then `refresh_unity`. See `references/urp-mobile-recipes.md`.
 - The `manage_graphics`, `manage_material`, `manage_texture`, `manage_shader` tools live in the `vfx` / core groups. If a call says the tool is unavailable, run `manage_tools(action="enable_group", group="vfx")` first. Volume / post-FX actions require URP (or HDRP) to be the active pipeline.
 
+## Explicit input — art-spec.yaml drives palette, lighting, and post
+
+When the project has an `art-spec.yaml` (canonical path + legacy roots in `docs/PIPELINE_CONVENTIONS.md`), this skill CONSUMES it — never improvise a scene-local look:
+
+- **Palette:** materials, backdrop/skybox, and fog colors come from the spec's `palette` (semantic `palette.roles` first). `GameTheme.cs` color hexes MUST equal art-spec palette hexes exactly — colors only (typography/spacing/radii are GameTheme-native, no art-spec source).
+- **Lighting:** implement the spec's `lighting` block (key/fill/rim/shadow/fog qualities). The key light's direction MUST match `craft.light_direction`, which equals composition.yaml `shadow_and_contact.key_light_direction` — ONE light direction shared by baked-in art, contact shadows, and the realtime sun. Do not invent a second source of truth for light direction.
+- **Post & shaders:** the global Volume implements `rendering.post`; materials follow `rendering.shader_family`.
+
+No art-spec (exploratory/prototype)? Proceed with this skill's defaults, flag the look as unlocked, and route to `unity-art-direction` before production art.
+
 ## Mobile-first lighting
 
 Lighting is REQUIRED for a premium scene, not optional polish: raw sprites/meshes on a solid color
@@ -159,8 +169,8 @@ mechanics below actually applied on top. Skipping the lighting/backdrop/post ste
 flat even with good art.
 
 1. Confirm URP active (Step 0); enable `vfx` group.
-2. Set a deliberate palette: 3–6 stylized **URP/Unlit** or **URP/Lit** flat-color materials, GPU instancing on.
-3. One directional light, **Baked** + Light Probes for movers; `bake_lighting`.
+2. Set the palette from art-spec `palette.roles`/arrays (no spec: a deliberate 3–6 color choice): stylized **URP/Unlit** or **URP/Lit** flat-color materials, GPU instancing on.
+3. One directional light aimed per the spec's `craft.light_direction` / composition `key_light_direction`, **Baked** + Light Probes for movers; `bake_lighting`.
 4. Add **fog** for depth and a gradient/skybox backdrop.
 5. Add a global **Volume**: Tonemapping (ACES), gentle Color Adjustments, Vignette, low Bloom on emissive accents only.
 6. Add **particle pops** on key gameplay events for juice.

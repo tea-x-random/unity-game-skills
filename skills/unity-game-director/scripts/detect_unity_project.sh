@@ -73,3 +73,21 @@ if [[ -f "$PS" ]] && grep -qiE 'iPhone|iOS' "$PS"; then
 else
   say "IOS_SETTINGS_PRESENT=NO (configure iOS target before release)"
 fi
+
+# --- Art-pipeline artifacts (cross-session RESUME probe) ---
+# Canonical root: Assets/<Game>/Art/{_ArtDirection,Approved}. Legacy reserved aliases
+# (probe, but never write new artifacts to): Assets/GameArt/, Assets/Art/.
+find_first() { find "$ROOT/Assets" -maxdepth 6 -type f -name "$1" 2>/dev/null | head -1; }
+spec="$(find_first art-spec.yaml)"
+comp="$(find_first composition.yaml)"
+reg="$(find_first registry.yaml)"
+say "ART_SPEC=${spec:-MISSING}"
+say "COMPOSITION=${comp:-MISSING}"
+say "ASSET_REGISTRY=${reg:-MISSING}"
+sheets="$(find "$ROOT/Assets" -maxdepth 7 -type f -path '*_ArtDirection/sheets/*' -name '*_canon.png' 2>/dev/null | wc -l | tr -d ' ')"
+say "CANON_SHEETS=${sheets:-0}"
+if [[ -n "$spec" || -n "$reg" ]]; then
+  say "ART_PIPELINE=RESUME (artifacts exist: resume from them — never re-derive style or regenerate approved assets)"
+else
+  say "ART_PIPELINE=FRESH (no art-spec/registry: establish art-spec.yaml via unity-art-direction before production art)"
+fi

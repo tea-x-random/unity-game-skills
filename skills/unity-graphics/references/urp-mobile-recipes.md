@@ -54,11 +54,11 @@ Verify: `manage_graphics(action="stats_get")` before/after; confirm SetPass/draw
 
 ```text
 manage_tools(action="enable_group", group="vfx")
-manage_material(action="create", path="Assets/Art/Mats/Stylized_Mint.mat", shader="Universal Render Pipeline/Unlit")
-manage_material(action="set_property", path="Assets/Art/Mats/Stylized_Mint.mat",
+manage_material(action="create", path="Assets/<Game>/Art/Materials/Stylized_Mint.mat", shader="Universal Render Pipeline/Unlit")
+manage_material(action="set_property", path="Assets/<Game>/Art/Materials/Stylized_Mint.mat",
                 property="_BaseColor", value=[0.55, 0.85, 0.7, 1])
 # Enable GPU instancing so shared instances batch:
-manage_material(action="set_property", path="Assets/Art/Mats/Stylized_Mint.mat",
+manage_material(action="set_property", path="Assets/<Game>/Art/Materials/Stylized_Mint.mat",
                 property="enableInstancing", value=true)
 ```
 

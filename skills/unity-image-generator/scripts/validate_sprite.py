@@ -14,10 +14,15 @@ padding, oversized textures, palette drift, over-rendered flat/cel targets,
 and non-square/non-seamless ground tiles.
 
 Examples:
-  python3 validate_sprite.py Assets/Art/Sprites/tree.png --require-alpha --json-report tree.qa.json
-  python3 validate_sprite.py coin.png --require-alpha --min-padding 4 --max-padding-variance 12
-  python3 validate_sprite.py icon.png --palette '#E54B4B,#FFD166,#2A9D8F' --max-palette-distance 85
+  python3 validate_sprite.py Assets/<Game>/Art/Source/SourceImages/tree.png --require-alpha --json-report tree.qa.json
+  python3 validate_sprite.py coin.png --require-alpha --min-padding 4 --max-padding-variance 12 --no-art-spec
+  python3 validate_sprite.py icon.png --art-spec Assets/MyGame/Art/_ArtDirection/art-spec.yaml
+  python3 validate_sprite.py sprite.png --palette-mode exact --max-distinct-colors 16   # pixel-art-strict
   python3 validate_sprite.py tile_grass.png --tile --square --power-of-two --expected-finish flat
+
+Production calls resolve the governing art-spec.yaml (--art-spec, $UNITY_ART_SPEC,
+or canonical Assets paths) and default --palette / --expected-finish from it;
+spec-less exploratory checks must pass --no-art-spec explicitly.
 """
 
 from __future__ import annotations
@@ -31,6 +36,8 @@ from pathlib import Path
 from typing import Iterable
 
 from PIL import Image
+
+import art_spec as artspec
 
 MATTE_COLORS = {
     "white": (255, 255, 255),
@@ -336,14 +343,43 @@ def validate(args: argparse.Namespace) -> dict:
             distances = [min(dist_rgb(sample, p) for p in palette) for sample in samples]
             avg_distance = sum(distances) / len(distances)
             p95 = sorted(distances)[int(0.95 * (len(distances) - 1))]
-            ok = avg_distance <= args.max_palette_distance
-            checks.append(Check(
-                "palette.distance",
-                "pass" if ok else "fail",
-                f"Average palette distance is {avg_distance:.1f}; max allowed is {args.max_palette_distance:.1f}.",
-                {"avg": avg_distance, "p95": p95, "samples": len(samples)},
-                {"max_avg": args.max_palette_distance, "palette": args.palette},
-            ))
+            if args.palette_mode == "exact":
+                # Deterministic membership check (pixel art / hard palette locks):
+                # every sampled opaque pixel must BE a palette color (within a
+                # small tolerance for AA edges), not merely near the palette.
+                off = [d for d in distances if d > args.palette_tolerance]
+                off_ratio = len(off) / len(distances)
+                ok = off_ratio <= args.max_offpalette_ratio
+                checks.append(Check(
+                    "palette.exact_membership",
+                    "pass" if ok else "fail",
+                    f"{off_ratio:.3%} of sampled opaque pixels are off-palette (tolerance {args.palette_tolerance}); max allowed is {args.max_offpalette_ratio:.3%}.",
+                    {"off_palette_ratio": off_ratio, "off_palette_samples": len(off), "samples": len(distances), "avg_distance": avg_distance, "p95": p95},
+                    {"palette_tolerance": args.palette_tolerance, "max_offpalette_ratio": args.max_offpalette_ratio, "palette": args.palette},
+                ))
+            else:
+                ok = avg_distance <= args.max_palette_distance
+                checks.append(Check(
+                    "palette.distance",
+                    "pass" if ok else "fail",
+                    f"Average palette distance is {avg_distance:.1f}; max allowed is {args.max_palette_distance:.1f}.",
+                    {"avg": avg_distance, "p95": p95, "samples": len(samples)},
+                    {"max_avg": args.max_palette_distance, "palette": args.palette},
+                ))
+
+    if args.max_distinct_colors is not None:
+        # Deterministic color-count histogram (pixel art / hard palette locks):
+        # exact distinct RGB values among sampled opaque pixels.
+        samples = sample_opaque_pixels(rgba, alpha, width, height, args.alpha_threshold, args.palette_samples)
+        distinct_exact = len(set(samples))
+        ok = distinct_exact <= args.max_distinct_colors
+        checks.append(Check(
+            "palette.max_distinct_colors",
+            "pass" if ok else "fail",
+            f"Found {distinct_exact} distinct opaque colors; max allowed is {args.max_distinct_colors}.",
+            {"distinct_colors": distinct_exact, "samples": len(samples)},
+            {"max_distinct_colors": args.max_distinct_colors},
+        ))
 
     if args.expected_finish in {"flat", "cel"}:
         distinct, sampled = quantize_distinct_colors(rgba, alpha, width, height, args.alpha_threshold)
@@ -384,6 +420,7 @@ def validate(args: argparse.Namespace) -> dict:
     report = {
         "schema": "unity-game-skills.sprite_qa.v1",
         "image": str(path),
+        "art_spec": getattr(args, "art_spec_path", None),
         "dimensions": {"width": width, "height": height},
         "mode": original_mode,
         "coverage": coverage,
@@ -417,10 +454,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--power-of-two", action="store_true", help="Require power-of-two dimensions")
     p.add_argument("--tile", action="store_true", help="Enable seamless-tile checks (edge wrap difference)")
     p.add_argument("--max-wrap-difference", type=float, default=0.08, help="Max opposite-edge RGB difference for --tile (default: 0.08)")
-    p.add_argument("--palette", help="Comma-separated project palette hexes, e.g. '#E54B4B,#FFD166,#2A9D8F'")
+    p.add_argument("--art-spec", help="Path to the governing art-spec.yaml (default: $UNITY_ART_SPEC or canonical Assets paths); fills --palette/--expected-finish defaults")
+    p.add_argument("--no-art-spec", action="store_true", help="Explicit override: validate without an art-spec (exploratory work only)")
+    p.add_argument("--palette", help="Comma-separated project palette hexes (default: from art-spec palette), e.g. '#E54B4B,#FFD166,#2A9D8F'")
+    p.add_argument("--palette-mode", choices=["distance", "exact"], default=None, help="distance = average-distance heuristic (default for non-pixel finishes); exact = per-pixel palette membership (auto-default when the resolved art-spec has craft.finish: pixel)")
+    p.add_argument("--palette-tolerance", type=float, default=0, help="Max RGB distance that still counts as a palette member in --palette-mode exact (default: 0)")
+    p.add_argument("--max-offpalette-ratio", type=float, default=0.02, help="Max fraction of sampled opaque pixels allowed off-palette in --palette-mode exact (default: 0.02, tolerates AA edges)")
+    p.add_argument("--max-distinct-colors", type=int, default=None, help="Fail if sampled opaque pixels contain more than N exact distinct colors (deterministic pixel-art color-count gate)")
     p.add_argument("--max-palette-distance", type=float, default=95, help="Max average RGB distance from palette (default: 95)")
     p.add_argument("--palette-samples", type=int, default=5000, help="Max opaque pixels sampled for palette check")
-    p.add_argument("--expected-finish", choices=["any", "flat", "cel"], default="any", help="Warn/fail if a flat/cel target appears over-rendered")
+    p.add_argument("--expected-finish", choices=["any", "flat", "cel"], default=None, help="Warn/fail if a flat/cel target appears over-rendered (default: from art-spec craft.finish, else any)")
     p.add_argument("--max-quantized-colors", type=int, default=180, help="Max quantized color buckets for flat/cel finish heuristic")
     p.add_argument("--max-local-gradient", type=float, default=0.035, help="Max local gradient for flat/cel finish heuristic")
     p.add_argument("--fail-over-render", action="store_true", help="Make finish heuristics fail instead of warn")
@@ -429,6 +472,24 @@ def build_parser() -> argparse.ArgumentParser:
 
 def main() -> int:
     args = build_parser().parse_args()
+
+    # Resolve the governing art-spec (fail-unless---no-art-spec) and default
+    # unset flags from it; explicit CLI values always win.
+    spec, spec_path = artspec.resolve_or_fail(args.art_spec, args.no_art_spec)
+    args.art_spec_path = spec_path
+    if spec is not None:
+        if not args.palette:
+            hexes = artspec.palette_hexes(spec)
+            args.palette = ",".join(hexes) if hexes else None
+        if args.expected_finish is None:
+            args.expected_finish = artspec.spec_finish(spec)
+        if args.palette_mode is None and artspec.get_path(spec, "craft.finish") == "pixel":
+            # Pixel finish is palette-strict by default: per-pixel membership,
+            # not the permissive average-distance heuristic.
+            args.palette_mode = "exact"
+    args.expected_finish = args.expected_finish or "any"
+    args.palette_mode = args.palette_mode or "distance"
+
     report = validate(args)
     text = json.dumps(report, indent=2)
     if args.json_report:

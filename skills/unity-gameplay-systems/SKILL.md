@@ -45,7 +45,7 @@ manage_components(action="add", target="Player", component="PlayerController")
 manage_editor(action="play") -> read_console -> manage_scene(action="screenshot") -> stop
 ```
 
-Primitives are fine to *prove the loop*; swap in real assets (from `unity-3d-generator` / `unity-image-generator`) before claiming premium. A screenshot of only primitives is not a finished game.
+Primitives are fine to *prove the loop* — flag each one as a placeholder in the ledger. **Registry-only rule for production visuals:** all visible sprites/meshes/materials on gameplay prefabs must come from the approved-asset registry (`unity-asset-pipeline`, `Assets/<Game>/Art/Approved/registry.yaml`) — never wire raw generator output into a gameplay prefab. Logic prefabs may wrap registry assets. Primitives are allowed only while the registry is empty (or for a surface the registry doesn't cover yet) and flagged as placeholders in the ledger. A screenshot of only primitives is not a finished game.
 
 ### Prefer full runtime construction over headless-wired serialized references
 
@@ -295,6 +295,7 @@ Up to 25 commands per batch (100 max); not transactional, so set `fail_fast=true
 - Real input path exercised: tap/swipe/drag actually moves/affects the player.
 - Core loop reachable: input → objective → win/lose **or** restart path works.
 - Ideally a PlayMode test via `run_tests(mode="PlayMode")` + `get_test_job`.
+- Visible art is registry-sourced (`unity-asset-pipeline`) and passes the `unity-aaa-graphics` scorecard, **or** remaining primitives are explicitly flagged as placeholders in the ledger.
 
 Full list: `references/checklists/new-game-definition-of-done.md`.
 

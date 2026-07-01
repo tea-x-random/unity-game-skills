@@ -1,5 +1,5 @@
 schema: unity-game-skills.composition.v1
-style_id: cozy_toy_diorama_v1
+style_id: cozy_toy_diorama_v1   # MUST equal art-spec.yaml style_id (canonical form <preset>_v<N>)
 camera_profile:
   profile_id: gameplay_iso_ortho_v1
   projection: orthographic
@@ -95,8 +95,16 @@ occlusion_budget:
   ui_safe_area_max_percent: 0
   foreground_allowed: true
 
+# Sprite / 2.5D scenes only — set the whole block to null for pure-3D games (Rule 0: one pixel density).
+pixel_density:
+  one_pixel_density: true          # ground texels-per-unit ≈ project PPU (art-spec craft.pixels_per_unit); measured, see scene-measurement.md
+  texel_tolerance_percent: 20      # allowed |texels_per_unit - PPU| / PPU before the measured gate fails
+  light_model: unlit_uniform       # unlit_uniform | lit_uniform — sprites and 3D ground share ONE light model
+  billboard_axis: y_only           # sprites yaw to camera, never pitch
+  sprite_pivot: bottom_center      # feet pivot; actors placed at ground y=0
+
 shadow_and_contact:
-  key_light_direction: upper_left
+  key_light_direction: upper_left  # MUST equal art-spec craft.light_direction
   shadow_direction: lower_right
   shadow_softness: soft
   contact_darkening_strength: medium
@@ -117,9 +125,19 @@ family_distribution:
 screenshot_tests:
   required_scenes: [BeautyCell_01, CameraScaleTest, LightingTest, MaterialTest, MobileDeviceTest]
   required_aspects: [portrait_9_19_5, tablet_4_3]
-  acceptance:
-    gameplay_first_read: true
-    no_unapproved_assets: true
+  # Deterministic gates — computed from Unity scene data via MCP (references/scene-measurement.md).
+  # A violation is a hard failure: move/remove assets, never argue with the number.
+  measured_acceptance:
     density_within_budget: true
     occlusion_within_budget: true
+    screen_heights_within_role_ranges: true
     camera_contracts_match: true
+    no_unapproved_assets: true     # every visible renderer resolves to a registry entry (or flagged placeholder)
+    one_pixel_density: true        # sprite/2.5D only; null when pixel_density block is null
+  # Qualitative dimensions — critique_image.py scene mode (unity-image-generator) vs the golden screen.
+  # Calibration period: low scores trigger re-roll/manual review, NOT a hard block.
+  scored_acceptance:
+    gameplay_first_read: true
+    layer_contrast_reads: true
+    grounding_consistent: true
+    scene_cohesion: true

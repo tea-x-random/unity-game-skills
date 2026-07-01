@@ -1,5 +1,6 @@
 # Unity game asset contract v1
-# Copy to Assets/Art/Approved/<asset_id>/asset-contract.yaml and fill with concrete values.
+# Copy to Assets/<Game>/Art/Approved/<asset_id>/asset-contract.yaml and fill with concrete values.
+# (Legacy roots Assets/Art/ and Assets/GameArt/ remain reserved aliases — see docs/PIPELINE_CONVENTIONS.md.)
 # Values should be generated from the approved art-spec.yaml + AssetBrief, then validated by
 # scripts/validate_asset_manifest.py and Unity import validators. Do not hand-flip qa flags.
 
@@ -7,31 +8,38 @@ schema: unity-game-skills.asset-contract.v1
 id: meadow_tree_a                  # stable snake_case identifier; directory name should match
 name: Meadow Tree A
 family: meadow_vegetation          # one of the families in art-spec.yaml
+style_id: cozy_toy_diorama_v1      # MUST match art-spec.yaml style_id (canonical form <preset>_v<N>)
+art_spec: Assets/<Game>/Art/_ArtDirection/art-spec.yaml   # resolvable path to the governing spec
 role: midground_obstacle           # gameplay/interactable/decor/far_bg/midground_obstacle/ui_icon/etc.
-style_id: cozy_toy_diorama_v1      # MUST match Assets/GameArt/_ArtDirection/art-spec.yaml
 importance: secondary              # hero | primary_gameplay | secondary | background | ui
 variant_of: null                   # canonical asset id if this is a variant
 state: default                     # default | damaged | alternate | seasonal | reward | disabled
 
 source:
-  generator: pixellab              # pixellab | tripo | gemini | authored | kitbash | vendor
-  source_art: Assets/Art/Source/meadow_tree_a.png
-  candidate_set: Assets/Art/QA/meadow_tree_a.candidates.json
-  best_candidate_report: Assets/Art/QA/meadow_tree_a.best.json
+  generator: gemini                # pixellab | tripo | gemini | authored | kitbash | vendor | elevenlabs
+  source_art: Assets/<Game>/Art/Source/meadow_tree_a.png
+  candidate_set: Assets/<Game>/Art/Source/QA/meadow_tree_a.candidates.json
+  best_candidate_report: Assets/<Game>/Art/Source/QA/meadow_tree_a.best.json
   prompt_hash: "sha256:<hash-of-final-prompt-or-brief>"
-  reference_pack: meadow_family_v1
-  seed: null
+  reference_pack:                  # resolvable file paths conditioned into generation (anchors, palette, sheets)
+    - Assets/<Game>/Art/_ArtDirection/palettes/master-palette.png
+    - Assets/<Game>/Art/Approved/meadow_tree_a/meadow_tree_a.png   # family golden (art-spec conditioning.golden_assets)
+  canon_sheet: null                # characters only: art-spec characters.<id>.canon_sheet path
+  identity_string: null            # characters only: copied VERBATIM from art-spec characters.<id>.identity_string
+  seed: null                       # provenance only — never an identity mechanism
   model_version: null              # e.g. pixflux | bitforge | tripo model version
   license: project_owned
   notes: "Canonical tree for meadow vegetation family."
 
 runtime:
   type: sprite                     # sprite | model | ui | texture | vfx | audio
-  prefab: Assets/Prefabs/Environment/MeadowTreeA.prefab
-  approved_folder: Assets/Art/Approved/meadow_tree_a
+  prefab: Assets/<Game>/Art/Prefabs/Environment/MeadowTreeA.prefab
+  approved_folder: Assets/<Game>/Art/Approved/meadow_tree_a
   pivot: bottom_center             # center | bottom_center | custom
   custom_pivot_normalized: null    # [0.5, 0.0] if pivot=custom for 2D
-  pixels_per_unit: 100             # required for sprite; null for pure 3D model
+  pixels_per_unit: 100             # required for sprite; null for pure 3D model.
+                                   # MUST equal art-spec craft.pixels_per_unit (the project PPU SSOT);
+                                   # this field is the fallback SSOT only when no art-spec exists.
   scale_meters: [1.2, 1.8, 1.2]    # world-space bounds target [x,y,z]
   collider:
     type: capsule                  # none | box | capsule | circle | polygon | mesh_lowpoly
@@ -39,11 +47,11 @@ runtime:
     size: [0.55, 1.35, 0.55]
     offset: [0.0, 0.65, 0.0]
   material_profile: World_Stylized_v1
-  material_path: Assets/Materials/World_Stylized_v1.mat
+  material_path: Assets/<Game>/Art/Materials/World_Stylized_v1.mat
   shader_keywords: []
   secondary_textures:              # for URP 2D lights / Sprite-Lit materials when used
-    normal_map: null               # e.g. Assets/Art/Approved/meadow_tree_a/meadow_tree_a_n.png
-    mask_map: null                 # e.g. Assets/Art/Approved/meadow_tree_a/meadow_tree_a_mask.png
+    normal_map: null               # e.g. Assets/<Game>/Art/Approved/meadow_tree_a/meadow_tree_a_n.png
+    mask_map: null                 # e.g. Assets/<Game>/Art/Approved/meadow_tree_a/meadow_tree_a_mask.png
   shadow_profile: soft_blob_v1     # none | soft_blob_v1 | realtime | baked_contact
   sorting_layer: Gameplay
   sorting_order_offset: 0
@@ -53,20 +61,44 @@ runtime:
     address: art/environment/meadow_tree_a
     group: Art_Environment
     labels: [art, environment, meadow_vegetation]
+  audio: null                      # runtime.type == audio only — replace null with the block below
+  # audio:                         # per-clip AudioImporter contract (unity-audio-generator)
+  #   load_type: decompress_on_load   # decompress_on_load (short SFX) | compressed_in_memory (VO) | streaming (music/ambience)
+  #   compression: vorbis
+  #   vorbis_quality: 0.7             # 0.0-1.0
+  #   force_to_mono: true             # true for SFX/VO; false (stereo) for music
+  #   loop: false                     # true ONLY after the seamless-loop crossfade post-process ran and was verified
+  #   target_lufs: -16.0              # loudness target; normalize before approval
+
+animation: null                    # animated assets only — replace null with the block below (unity-animation)
+# animation:
+#   sheet: Assets/<Game>/Art/Approved/<id>/Anim/<id>_sheet.png       # sprite-sheet source (2D frame animation; null for 3D skeletal)
+#   sheet_slicing: Assets/<Game>/Art/Approved/<id>/Anim/<id>_sheet.slicing.json
+#                                   # slicing manifest (frame rects/grid, e.g. extrude_atlas.py output) the
+#                                   # Editor import step slices from — never hand-slice a contracted sheet
+#   clips:                          # every clip shipped with this package (one row per clip on the sheet)
+#     - { name: idle,   row: 0, frames: 4, fps: 8,  loop: true,  asset: Assets/<Game>/Art/Approved/<id>/Anim/idle.anim }
+#     - { name: walk,   row: 1, frames: 6, fps: 10, loop: true,  asset: Assets/<Game>/Art/Approved/<id>/Anim/walk.anim }
+#     - { name: attack, row: 2, frames: 8, fps: 12, loop: false, asset: Assets/<Game>/Art/Approved/<id>/Anim/attack.anim }
+#   controller: Assets/<Game>/Art/Approved/<id>/Anim/<Id>.controller # Animator Controller wiring the clips
+#   key_pose: idle_frame_00         # designated pose/frame BeautyCell scores (references/beauty-cell.md);
+#                                   # animated assets are visually gated on this key pose
 
 import:
-  import_preset: Assets/Art/ImportPresets/Sprite_Foreground.preset
+  import_preset: Assets/<Game>/Art/ImportPresets/Sprite_Foreground.preset
   texture_type: Sprite             # Sprite | Default | NormalMap | GUI
   sprite_mode: Single              # Single | Multiple
   sprite_mesh_type: Tight          # Tight | FullRect
   alpha_is_transparency: true
-  filter_mode: Point               # Point for pixel art; Bilinear for non-pixel rendered sprites
+  filter_mode: Bilinear            # Bilinear for non-pixel rendered sprites; pixel-track contracts use Point
   mipmaps: false                   # false for 2D sprites/UI; true for tiling/material textures
   max_texture_size: 2048
-  compression: None                # None/RGBA32 for pixel art; NormalQuality/ASTC for non-pixel sprites
-  ios_format: RGBA32               # RGBA32 for pixel art; ASTC_6x6 for non-pixel sprites
-  android_format: RGBA32           # RGBA32 for pixel art; ASTC_6x6 for non-pixel sprites
-  sprite_atlas: Assets/Art/Atlases/Environment_Midground.spriteatlas
+  compression: NormalQuality       # NormalQuality/ASTC for non-pixel sprites; pixel-track contracts use None/RGBA32
+  ios_format: ASTC_6x6             # ASTC_6x6 for non-pixel sprites; pixel-track contracts use RGBA32
+  android_format: ASTC_6x6         # ASTC_6x6 for non-pixel sprites; pixel-track contracts use RGBA32
+  # Pixel-track contracts (art-spec craft.finish: pixel) pair source.generator: pixellab
+  # with filter_mode: Point, compression: None, ios/android_format: RGBA32.
+  sprite_atlas: Assets/<Game>/Art/Atlases/Environment_Midground.spriteatlas
   extruded_atlas_manifest: null     # set for sheet/tile atlas exports from extrude_atlas.py
   addressable: true
   readable: false
@@ -102,11 +134,11 @@ family_rules:
 qa:
   # These are output fields. Validators or Unity editor tools set these; do not hand-author to bypass gates.
   alpha_valid: false
-  sprite_qa_report: Assets/Art/QA/meadow_tree_a.sprite-qa.json
+  sprite_qa_report: Assets/<Game>/Art/Source/QA/meadow_tree_a.sprite-qa.json
   image_critique_valid: false
-  image_critique_report: Assets/Art/QA/meadow_tree_a.critique.json
+  image_critique_report: Assets/<Game>/Art/Source/QA/meadow_tree_a.critique.json
   import_valid: false
-  import_report: Assets/Art/Approved/meadow_tree_a/import-qa.json
+  import_report: Assets/<Game>/Art/Approved/meadow_tree_a/import-qa.json
   scale_valid: false
   material_valid: false
   secondary_textures_valid: false
@@ -114,9 +146,15 @@ qa:
   atlas_valid: false
   addressables_valid: false
   palette_valid: false
+  frame_diff_valid: false           # frame-based 2D animation (sprite / animation.sheet set): compare_frames_to_anchor.py
+                                    # (unity-pixel-art) report passes for every shipped strip/rotation set (animation
+                                    # identity gate). Set true (N/A) for assets with no animation block AND for 3D
+                                    # skeletal clips (sheet: null) — those are validated by unity-3d-generator's
+                                    # validate-animation instead.
+  frame_diff_report: null           # e.g. Assets/<Game>/Art/Source/QA/<id>_walk.frame-diff.json
   pixel_native_valid: false         # true when pixel-art assets were generated at native canvas, not downscaled
   scene_test_valid: false
-  beauty_cell_screenshot: Assets/Art/Approved/meadow_tree_a/BeautyCell_01.png
+  beauty_cell_screenshot: Assets/<Game>/Art/Approved/meadow_tree_a/BeautyCell_01.png
   visual_regression_valid: false
   approved: false
   approved_by: null

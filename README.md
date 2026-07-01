@@ -198,6 +198,8 @@ Start Claude Code and ask: *"What Unity skills do you have?"* — it should list
 
 You don't need all 26. Copy only the ones you want (e.g. just `unity-game-director`, `unity-mcp-bridge`, `unity-gameplay-systems`, `unity-graphics`, `unity-ui-designer` for an asset-key-free workflow).
 
+> **Always copy whole skill directories, never individual scripts.** Several scripts import sibling modules — e.g. `unity-image-generator/scripts/generate_image.py`, `validate_sprite.py`, and `critique_image.py` all import `art_spec.py` from the same `scripts/` directory and fail without it. When updating an existing install, re-copy (or symlink, Option C) the full skill directory so new sibling modules come along.
+
 ---
 
 ## Environment variables

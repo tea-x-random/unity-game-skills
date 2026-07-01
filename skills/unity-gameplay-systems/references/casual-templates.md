@@ -2,7 +2,7 @@
 
 Two ordered slice recipes. Every Editor action is an MCP call (`unity-mcp-bridge`); scripts are created via `create_script` and must compile clean (`read_console(types=["error"])`) before they are used. Confirm `mcpforunity://editor/state` is ready before each batch, and expect a ~5s domain-reload drop after every compile — wait and retry.
 
-Primitives prove the loop; swap in real sprites/models (`unity-image-generator` / `unity-3d-generator`) before claiming premium.
+Primitives prove the loop — flag each as a placeholder in the ledger. Production visuals are **registry-only**: every visible sprite/mesh/material on a gameplay prefab comes from the approved-asset registry (`unity-asset-pipeline`), never a raw generated file; logic prefabs may wrap registry assets. Primitives are legal only while the registry is empty and flagged as placeholders.
 
 ---
 
@@ -45,7 +45,7 @@ batch_execute(commands=[
 ], fail_fast=true)
 manage_prefabs(action="create", target="Tile", path="Assets/Prefabs/Tile.prefab")
 ```
-Assign a sprite from a **Sprite Atlas** (one draw call). Atlas/import via `unity-image-generator`.
+Assign a sprite from a **Sprite Atlas** (one draw call). Production sprites come from the approved registry (`unity-asset-pipeline` contract → prefab/sprite) — until one exists, keep the placeholder sprite flagged in the ledger.
 
 ### 4. Wire the scene
 ```text
@@ -76,7 +76,7 @@ HUD (score/restart) via `unity-ui-designer`. Optional `run_tests(mode="PlayMode"
 ```text
 manage_scene(action="create", name="Runner", path="Assets/Scenes/Runner.unity")
 manage_scene(action="load", path="Assets/Scenes/Runner.unity")
-manage_gameobject(action="create", name="Ground", primitive_type="Plane")  # placeholder track
+manage_gameobject(action="create", name="Ground", primitive_type="Plane")  # placeholder track — flag in ledger; production ground = registry asset
 ```
 
 ### 2. Scripts (create + compile-check each)
@@ -111,6 +111,7 @@ batch_execute(commands=[
 manage_prefabs(action="create", target="Coin", path="Assets/Prefabs/Coin.prefab")
 # repeat for Obstacle + a track Chunk prefab
 ```
+The Capsule/Cylinder prefabs above are gray-box placeholders — flag each in the ledger. For production, `unity-asset-pipeline`'s prefab factory produces the visual prefab from an approved contract; wrap it with the logic components above (registry visual as child, logic on the wrapper) instead of keeping the primitive.
 
 ### 4. Wire the scene
 ```text
@@ -139,4 +140,4 @@ URP look + lighting via `unity-graphics`; HUD/score via `unity-ui-designer`; Cin
 - After every `create_script` / package change: domain reload (~5s) — re-poll `editor/state`, re-fetch SHA before `apply_text_edits`.
 - On Unity 6: verify Input System touch/swipe and `CharacterController` APIs with `unity_reflect` before writing.
 - Pool everything that spawns repeatedly (tiles, coins, obstacles, chunks, popups). No `Instantiate`/`Destroy` in the run loop.
-- A screenshot of only gray primitives = slice proven, not premium. Swap in generated assets before any premium claim.
+- A screenshot of only gray primitives = slice proven, not premium. Swap to approved-registry assets (`unity-asset-pipeline`) before any premium claim — never wire raw generated files into gameplay prefabs.

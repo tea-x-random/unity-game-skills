@@ -18,8 +18,8 @@ The repo encourages generating multiple candidates and keeping the best instead 
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/select_best_candidate.py \
-  --candidates Assets/Art/QA/meadow_tree_a.candidates.json \
-  --json-report Assets/Art/QA/meadow_tree_a.best.json
+  --candidates Assets/<Game>/Art/Source/QA/meadow_tree_a.candidates.json \
+  --json-report Assets/<Game>/Art/Source/QA/meadow_tree_a.best.json
 ```
 
 Only refine the selected candidate to 2K. Do not manually cherry-pick without a written reason.
@@ -49,10 +49,10 @@ For Unity, generated sheets need engine-safe packing: duplicated edge pixels and
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/extrude_atlas.py \
-  --input Assets/Art/Source/meadow_tiles_raw.png \
+  --input Assets/<Game>/Art/Source/meadow_tiles_raw.png \
   --rows 4 --cols 4 --extrude 2 --padding 2 \
-  --output Assets/Art/Source/meadow_tiles_extruded.png \
-  --manifest Assets/Art/Source/meadow_tiles_extruded.json
+  --output Assets/<Game>/Art/Source/meadow_tiles_extruded.png \
+  --manifest Assets/<Game>/Art/Source/meadow_tiles_extruded.json
 ```
 
 Import/slice using `atlas_rect` from the manifest (excluding extrude border), then pack into the contract's SpriteAtlas.

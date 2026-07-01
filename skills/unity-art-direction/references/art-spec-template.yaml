@@ -1,10 +1,12 @@
 # art-spec.yaml — the locked single source of truth for a game's visual language.
-# Place at Assets/GameArt/_ArtDirection/art-spec.yaml. Approve BEFORE generating the first production asset.
-# Make intentional choices, then lock them — do not leave values generic. Values below are an EXAMPLE
-# (cozy_toy_diorama); replace with your project's deliberate choices.
+# Canonical path: Assets/<Game>/Art/_ArtDirection/art-spec.yaml (see docs/PIPELINE_CONVENTIONS.md;
+# legacy roots Assets/GameArt/ and Assets/Art/ stay reserved — probe them on discovery, write new specs here).
+# Approve BEFORE generating the first production asset. Make intentional choices, then lock them —
+# do not leave values generic. Values below are an EXAMPLE (cozy_toy_diorama preset); replace deliberately.
 
 project: "PROJECT_NAME"
-style_id: "cozy_toy_diorama"      # pick exactly one from references/style-presets.md
+style_id: "cozy_toy_diorama_v1"    # canonical form: <preset>_v<N>; preset from references/style-presets.md.
+                                   # Every asset-contract.yaml and composition.yaml MUST carry this exact string.
 secondary_influence: null          # optional, one named secondary influence
 platform: "iOS"
 engine: "Unity 6 URP"
@@ -13,6 +15,29 @@ camera:
   projection: "orthographic"       # orthographic | perspective
   angle: "3/4 top-down"
   framing_rule: "hero object occupies 55-70% of a reward-card frame"
+
+# Craft block — the production-physics contract every generator call must honor.
+# `finish` is ALWAYS set (skills branch on craft.finish). Pixel-only fields are null on non-pixel games.
+craft:
+  finish: "stylized_3d"            # pixel | painterly_2d | vector_flat | stylized_3d | realistic_3d
+  pixels_per_unit: 100             # PROJECT-WIDE PPU SSOT. Every sprite import, tilemap, and layout
+                                   # reads THIS value. Pixel track: usually == tile_size (e.g. 16).
+  base_render_resolution: null     # pixel only: internal render target for integer scaling, e.g. [320, 180]
+  tile_size: null                  # pixel only: px per tile, e.g. 16. Canvas sizes derive from tiles, never ad hoc.
+  char_tiles: null                 # pixel only: standard character footprint in tiles, e.g. [1, 2] (w, h)
+  outline_style: null              # pixel only. PixelLab EXACT enum strings — never invent shorthands:
+                                   # "single color black outline" | "single color outline" | "selective outline" | "lineless"
+                                   # (distinct from rendering.outline, the runtime 3D/shader outline pass)
+  view: null                       # pixel only: per-game DEFAULT camera view for sprites. PixelLab EXACT
+                                   # CameraView enum: "side" | "low top-down" | "high top-down".
+                                   # generate_pixel_art.py autofills --view from this; CLI overrides per call.
+  shading: null                    # pixel only: per-game DEFAULT shading level. PixelLab EXACT enum:
+                                   # "flat shading" | "basic shading" | "medium shading" | "detailed shading" |
+                                   # "highly detailed shading". Autofilled as --shading; CLI overrides per call.
+  light_direction: "upper_left"    # PROMPT-LEVEL token + vision-QA criterion (NO PixelLab API param exists).
+                                   # composition.yaml shadow_and_contact.key_light_direction MUST equal this.
+  dithering_policy: "none"         # PROMPT-LEVEL token + vision-QA criterion (NO API param), e.g.
+                                   # "none" | "sparse, shadow areas only" | "ordered dither for sky gradients"
 
 shape_language:
   primary: "rounded, slightly exaggerated, readable at thumbnail size"
@@ -23,6 +48,64 @@ palette:
   neutrals: ["#EDE6D7", "#5E5A55"]
   accent: ["#E86E4F"]
   max_high_chroma_accents_per_asset: 1
+  # Semantic roles — the ONLY hexes GameTheme.cs / UI tokens may use (derived, never invented).
+  roles:
+    ground: "#7FAF74"
+    panel: "#EDE6D7"
+    ink: "#5E5A55"                 # text / line / dark-outline color
+    accent_primary: "#E86E4F"      # rewards, CTAs, first-read interactables
+    accent_secondary: "#7BABC5"
+  # Hue-shifted ramps, dark → light (shadows shift cool, highlights shift warm — never straight
+  # value ramps). Pixel track REQUIRES ramps; master-palette.png is emitted from the union of these.
+  ramps:
+    grass: ["#3B5A40", "#5C8A54", "#7FAF74", "#AFD397"]
+    earth: ["#8A6B4A", "#C4A374", "#F3D7A0", "#F9EBC8"]
+    sky:   ["#4E7A99", "#7BABC5", "#A9CCDD"]
+
+# Conditioning block — persistent artifacts injected into EVERY production generation call.
+conditioning:
+  master_palette_png: "Assets/<Game>/Art/_ArtDirection/palettes/master-palette.png"
+                                   # PixelLab color_image-compatible swatch built from palette.ramps;
+                                   # passed as --color-image on every PixelLab call (derived frames may
+                                   # use the anchor's extracted sub-palette — a subset, never new colors).
+  style_anchor_images:             # bitforge --style-image sources; consumed ONE image per call
+    - "Assets/<Game>/Art/_ArtDirection/references/style_anchor_01.png"
+  golden_assets:                   # family → approved golden source image. "game" = the game golden
+    game: "Assets/<Game>/Art/Approved/hero_knight/hero_knight.png"     # the ONLY text-only (pixflux) roll;
+    meadow_vegetation: "Assets/<Game>/Art/Approved/meadow_tree_a/meadow_tree_a.png"  # family goldens derive from it
+
+# Characters block — THE authoritative canon index. Contracts and briefs reference these paths;
+# no other file may define a competing canon for a character.
+characters:
+  hero_knight:
+    canon_sheet: "Assets/<Game>/Art/_ArtDirection/sheets/hero_knight_canon.png"
+                                   # pixel track: PixelLab anchor/reference sheet; non-pixel: approved turnaround
+    anchor_sprite: "Assets/<Game>/Art/Approved/hero_knight/hero_knight.png"
+    identity_string: "small knight, round steel helmet with red plume, oversized pauldrons, short cape, stubby legs"
+                                   # FROZEN verbatim — copy exactly into every prompt; vary only pose/action clauses
+    skeleton_template: "Assets/<Game>/Art/_ArtDirection/sheets/biped_48.skeleton.json"
+                                   # one reused keypoint JSON per humanoid archetype = uniform cast proportions
+    seed: null                     # optional provenance ONLY — seeds are weak identity in this toolchain;
+                                   # identity is carried by anchor paths + identity_string, never seeds
+
+# Audio direction — the sound-world contract (consumed by unity-audio-generator). Production
+# audio prompts start with these tokens VERBATIM, the same way art conditions on the palette.
+# SFX identity rests ENTIRELY on the shared prompt tokens (no voice/style pin exists for SFX);
+# the pinned voice_id applies to TTS/VO only. No block = exploratory clips only.
+audio_direction:
+  prompt_prefix: "cozy toy-diorama game audio, soft rounded transients, warm and playful, no harsh highs"
+                                   # shared prefix every production sfx/music prompt starts with, verbatim
+  instrument_palette: ["marimba", "soft mallets", "pizzicato strings", "woodblock", "light shaker"]
+  mood_tokens: ["cozy", "bouncy", "gentle", "toylike"]   # keyed to style_id above; anti-mood lives in prose docs
+  voice_id: null                   # pinned ElevenLabs voice for ALL VO/TTS lines (applies to TTS only — never SFX)
+
+# Derived artifacts — generated FROM this spec, never hand-edited into divergence.
+# GameTheme.cs COLOR HEXES must equal palette hexes exactly (colors only — typography/spacing/radii
+# are GameTheme-native and have no art-spec source). Regenerate these when the spec changes.
+derived_artifacts:
+  style_guide_md: "Assets/<Game>/Art/_ArtDirection/style-guide.md"
+  game_theme_cs: "Assets/<Game>/Scripts/Game/GameTheme.cs"
+  ui_design_tokens: "Assets/<Game>/UI/design-tokens.json"
 
 materials:
   response: "matte stylized PBR"
@@ -39,7 +122,7 @@ lighting:
 
 rendering:
   shader_family: "URP Lit with a shared stylized Shader Graph layer"
-  outline: "off by default; use only if globally enabled"
+  outline: "off by default; use only if globally enabled"   # runtime shader outline (3D); 2D craft outline lives in craft.outline_style
   post: ["tonemapping", "subtle color adjustments"]
 
 scale:
@@ -68,7 +151,7 @@ acceptance:
 # -----------------------------------------------------------------------------
 # asset_id: "prop_mushroom_house_01"
 # asset_type: "interactive_environment_prop"
-# style_id: "cozy_toy_diorama"
+# style_id: "cozy_toy_diorama_v1"
 # gameplay_role: "safe home / destination landmark"
 # rarity_or_importance: "landmark"
 # scale_m: [4.0, 3.8, 4.5]
@@ -78,6 +161,12 @@ acceptance:
 # animation: "none"
 # collision: "simple_box_and_capsule"
 # texture_budget: "1024"
+# conditioning:                     # resolved from the spec blocks above — paths, not prose
+#   golden_asset: "Assets/<Game>/Art/Approved/meadow_tree_a/meadow_tree_a.png"  # family golden this asset conditions on
+#   style_anchor_image: null        # explicit override; one image per generation call
+#   master_palette_png: "Assets/<Game>/Art/_ArtDirection/palettes/master-palette.png"
+#   canon_sheet: null               # characters only: copy from characters.<id>.canon_sheet
+#   identity_string: null           # characters only: copy characters.<id>.identity_string VERBATIM
 # negative_constraints:
 #   - "no characters"
 #   - "no baked text"
@@ -86,9 +175,11 @@ acceptance:
 #   - "no excessive micro-detail"
 
 # -----------------------------------------------------------------------------
-# Suggested directory structure
+# Canonical directory layout (single-root doctrine — see docs/PIPELINE_CONVENTIONS.md)
 # -----------------------------------------------------------------------------
-# Assets/GameArt/
-#   _ArtDirection/   (art-spec.yaml, palettes/, references/)
+# Assets/<Game>/Art/
+#   _ArtDirection/   art-spec.yaml, style-guide.md, palettes/, references/, sheets/
+#   Approved/        registry.yaml, <asset_id>/ (contract + approved art + QA reports)
+#   Source/          raw generated staging (SourceImages/, TripoRaw/, CleanupQueue/, QA/)
 #   Characters/  Environment/  Props/  VFX/  UI/  Materials/  Shaders/  Prefabs/
-#   Generated/   (SourceImages/, TripoRaw/, CleanupQueue/)
+# Legacy roots Assets/GameArt/ and Assets/Art/ remain reserved aliases in existing projects.

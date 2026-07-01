@@ -5,7 +5,7 @@ Render a Tripo-generated model from the game camera into transparent PNG sprites
 ## Camera + lighting setup (match the game's angle)
 - **Orthographic camera** (no perspective distortion for 2D), `clearFlags = SolidColor`, `backgroundColor` with **alpha 0** for transparency.
 - Angle to match the game: top-down (look straight down), 3/4 (~30–45° tilt), or side (look along Z).
-- A simple key + fill light matching the project's `art-spec.yaml` lighting so rendered sprites match the rest of the set.
+- A simple key + fill light matching the project's `art-spec.yaml` `lighting` block, with the key aimed per `craft.light_direction` (== composition.yaml `shadow_and_contact.key_light_direction`) so rendered sprites match the rest of the set.
 - Frame the model so it fills the target sprite cell consistently (same camera distance/ortho size for every frame/angle so frames don't jitter).
 
 ## Render one frame to a transparent PNG

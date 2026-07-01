@@ -2,7 +2,7 @@
 
 One-line prompts produce one-line art. This library gives a reusable **prompt template**, **negative prompts**, a **refine loop**, and **genre art kits** with full exemplar prompts you can adapt as starting points. Use with `unity-pixel-art` (final pixel sprites/tiles/sheets), `unity-image-generator` (Gemini concepts/non-pixel 2D/textures/UI), and `unity-3d-generator` (models/non-pixel pre-render). Always condition on the project's style sheet from `unity-asset-designer` so assets stay on-model.
 
-> Replace every `[BRACKET]` with your project's own art-direction tokens (from the style guide). Keep the *structure*; vary the *tokens*.
+> Replace every `[BRACKET]` with your project's own art-direction tokens — verbatim from `art-spec.yaml` (the style SSOT; the style guide is a derived view). Keep the *structure*; vary the *tokens*. Reuse the exact same token strings across the whole asset set — paraphrasing causes drift.
 
 > **Style comes from the project, never from this library.** The tokens — including fidelity and finish — are the user's/style-guide's. "AAA" here means *intentional and cohesive*, **not** "high-detail." A flat, minimal, muted look done cohesively is premium; this library must serve it as readily as a glossy one. Do not let the examples below push a target toward more rendering than it wants.
 
@@ -82,7 +82,7 @@ Import tiling textures with `wrapMode = Repeat`, mipmaps **on** for 3D/material 
 > tiles seamlessly, no centered subject, no text.
 > NOT: busy, high-contrast, bold black outlines on every blade, saturated, focal subject, seams.
 > ```
-> Validate the recede: `validate_sprite.py [tile] --tile --square --power-of-two` + `critique_image.py --role background_tile --must-recede`.
+> Validate the recede: `validate_sprite.py [tile] --tile --square --power-of-two --art-spec <spec>` + `critique_image.py --role background_tile --must-recede --art-spec <spec>` (production QA fails without a resolvable art-spec; exploratory concepts pass `--no-art-spec`).
 
 ## Genre art kits
 

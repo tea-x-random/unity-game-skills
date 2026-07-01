@@ -25,15 +25,23 @@ Fail the candidate if any are true:
 - candidate violates composition density or occlusion budget;
 - screenshot differs materially from the reference frame beyond accepted tolerance.
 
+## Animated assets: score the designated key pose
+
+Animated assets (unity-animation) go through the same scenes, scored at the contract's `animation.key_pose`:
+
+- Render the designated key pose (the frame/sprite named in the contract) in every scene above; that screenshot is the visual-regression reference.
+- A re-generated sheet whose key pose drifts from the reference fails `CompareReferenceFrames` — same tolerance as statics.
+- Before approval, additionally play each clip in `ArtValidationScene` and reject baseline jitter (pivot/baseline must be stable across frames) and light-direction flips mid-clip.
+
 ## Suggested screenshot paths
 
 ```
-Assets/Art/Approved/<id>/Screenshots/ArtValidationScene.png
-Assets/Art/Approved/<id>/Screenshots/BeautyCell_01.png
-Assets/Art/Approved/<id>/Screenshots/CameraScaleTest.png
-Assets/Art/Approved/<id>/Screenshots/LightingTest.png
-Assets/Art/Approved/<id>/Screenshots/MaterialTest.png
-Assets/Art/Approved/<id>/Screenshots/MobileDeviceTest.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/ArtValidationScene.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/BeautyCell_01.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/CameraScaleTest.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/LightingTest.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/MaterialTest.png
+Assets/<Game>/Art/Approved/<id>/Screenshots/MobileDeviceTest.png
 ```
 
 Record these paths in `qa.*_screenshot` or the registry. A passing validator without recorded screenshot evidence is not a pass.

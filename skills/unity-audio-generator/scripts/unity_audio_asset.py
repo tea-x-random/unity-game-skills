@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Generate and process Three.js game audio assets with ElevenLabs."""
+"""Generate and process Unity game audio assets with ElevenLabs.
+
+Includes local post-processing (ffmpeg): `loopify` crossfades a clip's tail
+into its head for a seamless loop (ElevenLabs does NOT guarantee seamless
+loops), and `normalize` hits a target LUFS for the asset contract.
+"""
 
 from __future__ import annotations
 
@@ -7,6 +12,7 @@ import argparse
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import urllib.error
 import urllib.parse
@@ -81,7 +87,7 @@ def post_json_audio(args: argparse.Namespace, path: str, payload: dict[str, Any]
 
 
 def multipart_body(fields: dict[str, Any], files: dict[str, Path]) -> tuple[bytes, str]:
-    boundary = f"----threejs-audio-{uuid.uuid4().hex}"
+    boundary = f"----unity-audio-{uuid.uuid4().hex}"
     chunks: list[bytes] = []
 
     for name, value in fields.items():
@@ -220,6 +226,81 @@ def cmd_voice_change(args: argparse.Namespace) -> int:
     return 0
 
 
+def run_ffmpeg(cmd: list[str]) -> None:
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=300)
+    except FileNotFoundError as exc:
+        raise AudioGeneratorError(f"{cmd[0]} not found — loopify/normalize require ffmpeg+ffprobe on PATH.") from exc
+    if proc.returncode != 0:
+        raise AudioGeneratorError(f"{cmd[0]} failed: {proc.stderr.strip()[:500]}")
+
+
+def probe_duration(path: Path) -> float:
+    if not path.exists():
+        raise AudioGeneratorError(f"Input file not found: {path}")
+    cmd = [
+        "ffprobe", "-v", "error", "-show_entries", "format=duration",
+        "-of", "default=noprint_wrappers=1:nokey=1", str(path),
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except FileNotFoundError as exc:
+        raise AudioGeneratorError("ffprobe not found — loopify requires ffmpeg+ffprobe on PATH.") from exc
+    if proc.returncode != 0:
+        raise AudioGeneratorError(f"ffprobe failed: {proc.stderr.strip()[:500]}")
+    return float(proc.stdout.strip())
+
+
+def cmd_loopify(args: argparse.Namespace) -> int:
+    """Make a clip seamlessly loopable by crossfading its tail into its head.
+
+    This is a LOCAL post-process: ElevenLabs does not return guaranteed-seamless
+    loops, so any contract with runtime.audio.loop: true must run through this
+    (or an equivalent) before approval. The loop start/end sample is the original
+    audio at t=crossfade, so the seam is exact by construction.
+    """
+    src = Path(args.input)
+    out = Path(args.out)
+    c = args.crossfade
+    duration = probe_duration(src)
+    if c <= 0 or duration <= 2 * c:
+        raise AudioGeneratorError(
+            f"Clip ({duration:.2f}s) too short for a {c:.2f}s crossfade; need duration > 2x crossfade."
+        )
+    body_end = duration - c
+    filter_complex = (
+        f"[0:a]atrim=start={c}:end={body_end},asetpts=PTS-STARTPTS[body];"
+        f"[0:a]atrim=start={body_end},asetpts=PTS-STARTPTS[tail];"
+        f"[0:a]atrim=end={c},asetpts=PTS-STARTPTS[head];"
+        f"[tail][head]acrossfade=d={c}:c1=tri:c2=tri[xf];"
+        f"[body][xf]concat=n=2:v=0:a=1[out]"
+    )
+    out.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg([
+        "ffmpeg", "-y", "-i", str(src),
+        "-filter_complex", filter_complex, "-map", "[out]", str(out),
+    ])
+    print(f"Seamless loop saved: {out.resolve()} (length {duration - c:.2f}s, crossfade {c:.2f}s)")
+    print("Verify by playing 2-3 wraps in Unity with AudioSource.loop before setting the contract loop flag.")
+    return 0
+
+
+def cmd_normalize(args: argparse.Namespace) -> int:
+    """Normalize loudness to the contract's runtime.audio.target_lufs via ffmpeg loudnorm."""
+    src = Path(args.input)
+    out = Path(args.out)
+    if not src.exists():
+        raise AudioGeneratorError(f"Input file not found: {src}")
+    out.parent.mkdir(parents=True, exist_ok=True)
+    run_ffmpeg([
+        "ffmpeg", "-y", "-i", str(src),
+        "-af", f"loudnorm=I={args.target_lufs}:TP={args.true_peak}:LRA={args.lra}",
+        str(out),
+    ])
+    print(f"Normalized audio saved: {out.resolve()} (target {args.target_lufs} LUFS)")
+    return 0
+
+
 def add_common(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--api-key", help="ElevenLabs API key; defaults to ELEVENLABS_API_KEY")
 
@@ -236,7 +317,7 @@ def add_voice_settings(parser: argparse.ArgumentParser) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Generate and process Three.js game audio assets.")
+    parser = argparse.ArgumentParser(description="Generate and process Unity game audio assets.")
     sub = parser.add_subparsers(dest="command", required=True)
 
     probe = sub.add_parser("probe", help="Report whether ELEVENLABS_API_KEY is available.")
@@ -287,6 +368,20 @@ def build_parser() -> argparse.ArgumentParser:
     voice.add_argument("--optimize-streaming-latency", type=int, choices=range(0, 5))
     voice.set_defaults(func=cmd_voice_change)
 
+    loopify = sub.add_parser("loopify", help="Local crossfade post-process: make a music/ambience clip seamlessly loopable (requires ffmpeg).")
+    loopify.add_argument("--input", required=True)
+    loopify.add_argument("--out", required=True, help="Output path; use .wav so Unity re-encodes to Vorbis at import")
+    loopify.add_argument("--crossfade", type=float, default=0.5, help="Crossfade seconds blended from tail into head (default: 0.5)")
+    loopify.set_defaults(func=cmd_loopify)
+
+    normalize = sub.add_parser("normalize", help="Loudness-normalize a clip to the contract's target LUFS (requires ffmpeg).")
+    normalize.add_argument("--input", required=True)
+    normalize.add_argument("--out", required=True)
+    normalize.add_argument("--target-lufs", type=float, default=-16.0, help="Integrated loudness target (default: -16 LUFS)")
+    normalize.add_argument("--true-peak", type=float, default=-1.0, help="Max true peak dBTP (default: -1.0)")
+    normalize.add_argument("--lra", type=float, default=11.0, help="Loudness range target (default: 11)")
+    normalize.set_defaults(func=cmd_normalize)
+
     return parser
 
 
@@ -296,7 +391,7 @@ def main() -> int:
     try:
         return args.func(args)
     except AudioGeneratorError as exc:
-        eprint(f"threejs_audio_asset.py: {exc}")
+        eprint(f"unity_audio_asset.py: {exc}")
         return 1
 
 

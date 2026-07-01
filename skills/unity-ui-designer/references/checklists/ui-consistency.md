@@ -7,6 +7,7 @@ Run AFTER the screens exist, BEFORE calling UI "done". This catches the drift th
 - [ ] **Typography scale, not literals** — labels reference a small named set (Title/Heading/Body/Caption…) on the theme. Grep the UI code for raw font-size numbers at call sites; there should be ~none. (The example game had 16 distinct magic sizes — a fail.)
 - [ ] **Spacing scale** — paddings/margins/gaps come from a stepped scale (xs/s/m/l/xl), not arbitrary per-screen numbers.
 - [ ] **Semantic color roles** — widgets reference roles (`textPrimary`, `panel`, `accent`, `conflict`, `success`), not raw `new Color(...)` at call sites. A re-skin is a one-place change.
+- [ ] **Hexes equal art-spec** — when the project has an `art-spec.yaml`, every GameTheme/theme color hex equals an art-spec palette hex (`palette.roles` + arrays) EXACTLY; no invented UI colors. Scope: colors only — typography/spacing/radii are theme-native and have no art-spec source.
 - [ ] **Radii + icon/touch sizes tokenized** — one rounded-rect language; touch-min (~88px @2x = 44pt) is a named constant.
 - [ ] **Theme self-heals** — `CreateInstance` of the theme gives the real values (default fields), so a null/headless asset ref still renders; no stale `Resources` theme asset shadows the `.cs` defaults.
 

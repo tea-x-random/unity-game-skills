@@ -106,9 +106,12 @@ On any board where sprites overlap (iso, 2.5D, foot-anchored top-down), draw far
 ## Pixels-per-unit (PPU) consistency
 
 Mismatched PPU is a silent scale bug: if the ground/tile art imports at one PPU and the piece sprites at
-another, pieces are the wrong size relative to cells no matter how good the mapping is. Pick one project
-PPU, import all gameplay sprites at it, and size the camera/cells around it. Size a piece to **cell
-units** (e.g. "1.2 cells tall") computed from `CellToWorld`, not from raw pixels.
+another, pieces are the wrong size relative to cells no matter how good the mapping is. **The project PPU
+is READ, never picked:** the SSOT is `art-spec.yaml:craft.pixels_per_unit` (unity-art-direction); if no
+art-spec exists yet, fall back to `asset-contract.yaml:runtime.pixels_per_unit` (unity-asset-pipeline),
+which must be uniform across the registry. Never pick a local/hardcoded PPU value — one game = one PPU
+(one pixel density, no mixels). Import all gameplay sprites at it and size the camera/cells around it.
+Size a piece to **cell units** (e.g. "1.2 cells tall") computed from `CellToWorld`, not from raw pixels.
 
 ## Input picking, end to end
 
@@ -150,7 +153,8 @@ units** (e.g. "1.2 cells tall") computed from `CellToWorld`, not from raw pixels
 - [ ] Anchor decided once (foot-pivot for actors, center for tokens) and **baked into sprite pivots**,
       not coded as a height offset.
 - [ ] Sort Point = Pivot; Transparency Sort Axis (0,1,0) [or iso (0,1,−0.26)]; tilemap Mode Individual.
-- [ ] All gameplay sprites at one PPU; pieces sized in cell units.
+- [ ] All gameplay sprites at the project PPU read from `art-spec.yaml:craft.pixels_per_unit` (contract
+      fallback); pieces sized in cell units.
 - [ ] Alignment validated: a marker in every cell sits dead-center on the drawn grid (screenshot).
 - [ ] Camera fits the board across aspect ratios; HUD inside `Screen.safeArea`.
 

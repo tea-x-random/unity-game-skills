@@ -19,5 +19,5 @@ Each baked sprite contract should record:
 2. Disable arbitrary generated PBR material response; assign the project's shared stylized material profile before baking.
 3. Render with transparent background and premultiplied/straight-alpha settings tested in Unity.
 4. Keep shadow/contact-darkening either baked consistently into the atlas OR produced by a shared runtime shadow profile — not both randomly.
-5. Validate the output atlas with `unity-image-generator/scripts/validate_sprite.py --require-alpha`.
+5. Validate the output atlas with `unity-image-generator/scripts/validate_sprite.py --require-alpha --art-spec <spec>` (the script FAILS without a resolvable art-spec; `--no-art-spec` is for exploratory bakes only).
 6. Import the atlas with `SpriteImportMode.Multiple`, PPU from contract, mipmaps off, ASTC for iOS, and a SpriteAtlas pack for the whole family. For pixel art use Point filtering, uncompressed/RGBA32, and Pixel Perfect Camera settings from `unity-pixel-art/references/pixel-import.md`.

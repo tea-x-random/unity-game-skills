@@ -8,11 +8,13 @@ Concrete wiring for both tracks. Run these through `execute_code` after the asse
 Import the strip with `spriteImportMode = Multiple`, then slice by cell count (set in the Sprite Editor, or via `ISpriteEditorDataProvider`). Keep a **consistent pivot** (usually bottom-center for characters) so frames don't jitter.
 
 ```csharp
-var path = "Assets/Art/Sprites/archer_fire.png";
+var path = "Assets/<Game>/Art/Approved/archer/Anim/archer_fire.png";
 var ti = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath(path);
 ti.textureType = UnityEditor.TextureImporterType.Sprite;
 ti.spriteImportMode = UnityEditor.SpriteImportMode.Multiple;
-ti.filterMode = UnityEngine.FilterMode.Bilinear;   // Point for pixel art
+// filterMode comes from the asset contract (`import.filter_mode`) — never hardcode it here.
+// Pixel track: Point (Bilinear blurs pixel art and fails the pixel QA gate). Non-pixel rendered sprites: Bilinear.
+ti.filterMode = UnityEngine.FilterMode.Point;      // <- pixel-track value shown; read yours from the contract
 ti.SaveAndReimport();
 // Then slice: Sprite Editor → Slice → Grid by Cell Count (e.g. 8x1), pivot Bottom.
 ```
@@ -32,7 +34,7 @@ var keys = new UnityEditor.ObjectReferenceKeyframe[sprites.Length];
 for (int i = 0; i < sprites.Length; i++)
     keys[i] = new UnityEditor.ObjectReferenceKeyframe { time = i / clip.frameRate, value = sprites[i] };
 UnityEditor.AnimationUtility.SetObjectReferenceCurve(clip, binding, keys);
-UnityEditor.AssetDatabase.CreateAsset(clip, "Assets/Art/Anim/archer_fire.anim");
+UnityEditor.AssetDatabase.CreateAsset(clip, "Assets/<Game>/Art/Approved/archer/Anim/archer_fire.anim");
 ```
 
 Build one clip per state (`idle`, `aim`, `fire`, …). Loop idle/walk; one-shot attack/death.
@@ -49,7 +51,7 @@ Build one clip per state (`idle`, `aim`, `fire`, …). Loop idle/walk; one-shot 
 ## C. Animator Controller + parameters (both tracks)
 ```csharp
 var ac = UnityEditor.Animations.AnimatorController.CreateAnimatorControllerAtPath(
-    "Assets/Art/Anim/Archer.controller");
+    "Assets/<Game>/Art/Approved/archer/Anim/Archer.controller");
 ac.AddParameter("Fire", UnityEngine.AnimatorControllerParameterType.Trigger);
 ac.AddParameter("Aiming", UnityEngine.AnimatorControllerParameterType.Bool);
 

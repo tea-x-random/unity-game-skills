@@ -25,9 +25,22 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh   #
 ```
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/generate_image.py \
-  --prompt "..." --filename Assets/Art/Sprites/coin.png --resolution 2K
+  --prompt "..." --filename Assets/<Game>/Art/Source/coin.png --resolution 2K \
+  --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml
 ```
-Flags: `--prompt/-p`, `--filename/-f` (write under `Assets/`), `--input-image/-i` (edit an existing image), `--resolution/-r {1K,2K,4K}`, `--api-key/-k`.
+Flags: `--prompt/-p`, `--filename/-f` (write under `Assets/`), `--input-image/-i` (REPEATABLE — edit/reference inputs), `--input-role` (repeatable; pairs with `-i` by position, e.g. "character identity", "art style" — sent to Gemini as interleaved text parts, there is no native role param), `--resolution/-r {1K,2K,4K}` (default: auto from the largest input image, else 1K; an EXPLICIT value always wins — hi-res reference sheets no longer inflate the output), `--art-spec PATH` / `--no-art-spec`, `--character <id>` (attaches that character's `canon_sheet` from the art-spec and injects its frozen `identity_string` verbatim), `--no-spec-anchors`, `--api-key/-k`.
+
+**Art-spec rule (production calls):** the script resolves `art-spec.yaml` via `--art-spec` → `$UNITY_ART_SPEC` → the canonical/legacy roots (`Assets/*/Art/_ArtDirection/art-spec.yaml`, `Assets/GameArt/...`, `Assets/Art/...`), then injects the spec's verbatim style paragraph + light direction into the prompt and auto-attaches its `conditioning.style_anchor_images`. If no spec resolves, the call **fails** — exploratory/concept work must opt out explicitly with `--no-art-spec`. The same rule applies to `validate_sprite.py` and `critique_image.py`.
+
+## Production assets MUST be conditioned on canon references (discovery step)
+
+A text-only prompt is an independent dice roll — the literal mechanism behind cross-asset drift. Before generating any production 2D asset, DISCOVER the project's canon:
+
+1. Resolve the art-spec (above); read its `conditioning` block (`style_anchor_images`, `golden_assets`) and `characters` block (`canon_sheet`, `identity_string`) — `unity-asset-designer` writes these.
+2. Check the approved registry (`Assets/<Game>/Art/Approved/registry.yaml`) for the asset's family golden.
+3. Probe `Assets/<Game>/Art/_ArtDirection/sheets/` and `Assets/**/Art/Refs/` for canon/turnaround sheets.
+
+If canon artifacts exist they MUST be attached: `--character <id>` for a recurring character; `-i <family_golden> --input-role "art style"` for family members; spec anchors attach automatically. Generating production art for a project that has canon sheets WITHOUT attaching them is invalid. Concepts/style boards may skip (via `--no-art-spec`).
 
 **Alpha is preserved by default — never flatten foreground sprites onto white.** `generate_image.py` writes real PNG alpha unless you ask otherwise:
 - `--alpha-mode preserve` (default) — keep the model's RGBA verbatim. Use for sprites the model already returned with transparency.
@@ -124,8 +137,9 @@ Recommended command for a foreground prop:
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/generate_image.py \
   --prompt "single centered <SUBJECT>, solid magenta background, clean non-overlapping silhouette, no shadow baked into the matte, <STYLE TOKENS>" \
-  --filename Assets/Art/Source/meadow_tree_a.png \
+  --filename Assets/<Game>/Art/Source/meadow_tree_a.png \
   --resolution 2K \
+  --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml \
   --alpha-mode chroma-key \
   --chroma-key-color magenta
 ```
@@ -136,13 +150,15 @@ Run `validate_sprite.py` on every generated 2D foreground object before import. 
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
-  Assets/Art/Source/meadow_tree_a.png \
+  Assets/<Game>/Art/Source/meadow_tree_a.png \
   --require-alpha \
   --min-padding 4 \
   --max-width 2048 --max-height 2048 \
-  --palette '#6FAE5A,#4F8A3E,#2D3A2A,#F5E6B8' \
-  --json-report Assets/Art/QA/meadow_tree_a.sprite-qa.json
+  --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml \
+  --json-report Assets/<Game>/Art/Source/QA/meadow_tree_a.sprite-qa.json
 ```
+
+`--art-spec` fills `--palette` (all spec palette hexes) and `--expected-finish` (from `craft.finish`) — never hand-type the palette on production checks; a per-family CLI `--palette` override is allowed when the family legitimately uses a sub-palette. For hard palette locks (pixel-adjacent or strict flat styles) use the deterministic modes: `--palette-mode exact` (per-pixel palette membership, tolerant of AA edges via `--max-offpalette-ratio`) and `--max-distinct-colors N` (exact color-count gate).
 
 Reject and regenerate/fix the asset if any of these fail:
 - **non-transparent corners** when transparency is required (painted checkerboard or matte background);
@@ -158,10 +174,10 @@ For tiles/backgrounds, use tile mode instead of alpha mode:
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
-  Assets/Art/Source/tile_grass.png \
+  Assets/<Game>/Art/Source/tile_grass.png \
   --tile --square --power-of-two \
-  --expected-finish flat --fail-over-render \
-  --json-report Assets/Art/QA/tile_grass.sprite-qa.json
+  --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml --fail-over-render \
+  --json-report Assets/<Game>/Art/Source/QA/tile_grass.sprite-qa.json
 ```
 
 For a target that is explicitly flat/cel, `--expected-finish flat|cel` warns (or fails with `--fail-over-render`) when the asset drifts into glossy gradients or painterly rendering.
@@ -172,14 +188,21 @@ Self-grading by the generating agent is unreliable — broken art silently "look
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/critique_image.py \
-  Assets/Art/Source/prop_rock.png \
+  Assets/<Game>/Art/Source/prop_rock.png \
   --subject "a cute mossy grey rock boulder" \
-  --role foreground_prop --finish flat --outline bold \
-  --palette '#1A1A2E,#4CD964,#9AA0A6' \
-  --json-report Assets/Art/QA/prop_rock.critique.json
+  --role foreground_prop --outline bold \
+  --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml \
+  --reference Assets/<Game>/Art/Approved/rock_family/rock_golden.png \
+  --json-report Assets/<Game>/Art/Source/QA/prop_rock.critique.json
 ```
 
+`--art-spec` fills palette/finish/light-direction intent from the spec. **On-model gate:** pass `--reference <canon sheet / family golden>` (repeatable) so the judge can SEE the canon — it scores an `on_model_vs_reference` axis (0–3; N/A→3 without a reference). Critiquing a character/family production asset without its reference attached leaves identity drift invisible — always attach it when canon exists.
+
+**Scene mode (whole-screen coherence):** `--scene-mode` scores a composed-scene screenshot on `focal_read` / `layer_contrast` / `grounding` / `cohesion` (+ `on_model_vs_reference` vs a golden screen via `--reference`). Numeric composition budgets (density cost, occlusion %, screen-height %) are measured deterministically from Unity scene data via MCP (`unity-scene-composition`) — never asked of the VLM. Calibration: low scene scores trigger re-roll/review, not a hard block.
+
 It exits non-zero on `fail` and lists `blocking_issues` + `top_fixes`. Feed those fixes back into a **rewritten** prompt (don't reroll the same one). Needs `GEMINI_API_KEY`; if missing, do a documented manual review instead and say so — never claim a critique that did not run. Use `--dry-run` to inspect the request without calling the API.
+
+> Future work (deliberately not built): a CLIP-embedding family-similarity gate was evaluated and demoted — heavy new dependency, semantics-dominated and noisy on small game sprites, uncalibrated threshold. Prefer the deterministic checks (`validate_sprite.py --palette-mode exact`, `--max-distinct-colors`) plus the `--reference` critique axis.
 
 ## Generate per visual LAYER — recessive vs focal (most-missed rule)
 
@@ -240,8 +263,8 @@ For production assets, do not accept the first plausible image. Generate **3–6
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/select_best_candidate.py \
-  --candidates Assets/Art/QA/<asset_id>.candidates.json \
-  --json-report Assets/Art/QA/<asset_id>.best.json
+  --candidates Assets/<Game>/Art/Source/QA/<asset_id>.candidates.json \
+  --json-report Assets/<Game>/Art/Source/QA/<asset_id>.best.json
 ```
 
 Only the selected candidate gets refined to 2K and promoted into `unity-asset-pipeline`. This “best-of-N + keep-best” pattern is adapted from image-extension workflows and prevents weak first passes from becoming canon. For the full adapted workflow, read `references/image-extender-findings.md` when doing batch art generation, tilesets, sprite sheets, or outpainted backgrounds.
@@ -252,10 +275,10 @@ When generating a family sheet, tile sheet, or sprite sheet, repack it with dupl
 
 ```bash
 python3 ~/.claude/skills/unity-image-generator/scripts/extrude_atlas.py \
-  --input Assets/Art/Source/meadow_tiles_raw.png \
+  --input Assets/<Game>/Art/Source/meadow_tiles_raw.png \
   --rows 4 --cols 4 --extrude 2 --padding 2 \
-  --output Assets/Art/Source/meadow_tiles_extruded.png \
-  --manifest Assets/Art/Source/meadow_tiles_extruded.json
+  --output Assets/<Game>/Art/Source/meadow_tiles_extruded.png \
+  --manifest Assets/<Game>/Art/Source/meadow_tiles_extruded.json
 ```
 
 Slice using the manifest's `atlas_rect` (excluding the extruded border), then record the final `sprite_atlas` / `atlas_group` in the asset contract.
@@ -269,9 +292,9 @@ Generate at **1K** first to check composition. If framing/subject is wrong, **re
 After writing the PNG under `Assets/`, `refresh_unity(scope="assets", wait_for_ready=true)`, then set import settings with `execute_code` (`TextureImporter`) — Unity's default `textureType` may not match intent:
 
 ```csharp
-var ti = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath("Assets/Art/Sprites/coin.png");
+var ti = (UnityEditor.TextureImporter)UnityEditor.AssetImporter.GetAtPath("Assets/<Game>/Art/Approved/coin/coin.png");
 ti.textureType = UnityEditor.TextureImporterType.Sprite;     // Sprite (2D and UI)
-ti.spritePixelsPerUnit = 100;                                // match your world scale
+ti.spritePixelsPerUnit = ppuFromArtSpec;                     // READ from art-spec.yaml craft.pixels_per_unit (project PPU SSOT; contract runtime.pixels_per_unit when no spec exists) — never a locally picked number
 ti.spriteImportMode = UnityEditor.SpriteImportMode.Single;   // or .Multiple for sheets, then slice
 ti.filterMode = UnityEngine.FilterMode.Bilinear;             // For pixel art, route to unity-pixel-art and use Point
 ti.mipmapEnabled = false;                                    // off for UI/2D sprites
@@ -301,6 +324,7 @@ Then:
 
 ## Field notes & lessons
 
+- **Art-spec + canon plumbing landed (deep-review R5/R8a/R13/R14).** `generate_image.py` now takes repeated `--input-image`/`--input-role` (role-interleaved text parts), `--art-spec` (verbatim style paragraph + light direction injected; style anchors auto-attached; fail-unless-`--no-art-spec`), `--character <id>` (canon sheet + frozen identity_string), and a fixed resolution sentinel (explicit `-r` always wins; hi-res inputs no longer inflate output). `validate_sprite.py`/`critique_image.py` default palette/finish from the spec; `critique_image.py` gained `--reference` + `on_model_vs_reference` (0–3 scale, unchanged thresholds for `select_best_candidate.py`) and `--scene-mode` (focal read / layer contrast / grounding / cohesion — numeric budgets stay deterministic, measured from scene data). `validate_sprite.py` gained `--palette-mode exact` + `--max-distinct-colors` as the deterministic identity/palette gate (CLIP family gate deliberately demoted to future work).
 - **Policy: Pixel art → PixelLab final; static non-pixel/concept → Gemini; non-pixel motion/3D → Tripo.** Gemini is for static art, textures, grounds, backgrounds, UI/icons, and concept/reference images; PixelLab (`unity-pixel-art`) is for final pixel-native sprites/sheets; Tripo is for runtime 3D and high-res/painterly pre-rendered motion. Gemini frame-by-frame animation drifts and is fallback/concept only.
 - Gemini image pipeline confirmed working once billing is on (`gemini-3-pro-image-preview` via `generate_image.py`, `.artvenv` with google-genai+pillow); added the interactive-only key export trick for non-interactive tool shells (`zsh -ic`, not `-lc`; no `timeout` on macOS); noted non-Latin text needs a matching TMP font (default LiberationSans has no glyphs for many scripts) — fall back to a supported script until imported.
 - **Style-neutrality + per-axis measurement is the law here (learned the hard way, TWICE on one game).** Pass 1: a flat puzzle game generated from *injected* adjectives ("cozy storybook thick-ink, warm") → beautiful but wrong (heavy ink, painterly, dominant bg). Pass 2 *over-corrected* by sliding every axis to "light" (thin outline, muted, no shadow, no grid) → still wrong. Truth (measured): flat fill + **bold** dark-brown outline + white **sticker-halo** + **drop shadows** + **saturated** palette + **visible grid**. The lesson: (1) all style tokens come from the user/reference, never the skill's priors; (2) **style is multi-axis and the axes are INDEPENDENT — measure each separately by zooming + sampling pixels; never collapse to one "heavy/light" knob** ("flat" constrains only the fill); (3) counter-steer the model only on axes where the measured target differs; (4) validate **per-axis** side-by-side with the actual reference; (5) what the mock shows, the engine must render (the grid was mocked but never built). See "Match a reference" above.

@@ -1,6 +1,6 @@
 # Style preset library
 
-Choose **exactly one** primary `style_id` (optionally one named secondary influence). References are **broad direction only** — never request a clone of a specific living artist, game, character, or proprietary asset; translate the intent into the project's own shape, palette, material, and lighting rules.
+Choose **exactly one** primary preset (optionally one named secondary influence). Preset names below are unversioned; the per-game `style_id` written into `art-spec.yaml` is the canonical versioned form **`<preset>_v<N>`** (e.g. `cozy_toy_diorama_v1`) and must appear verbatim in every `asset-contract.yaml` and `composition.yaml`. References are **broad direction only** — never request a clone of a specific living artist, game, character, or proprietary asset; translate the intent into the project's own shape, palette, material, and lighting rules.
 
 > Keep **style** distinct from **genre** and **camera**. Style = the visual grammar; genre = the gameplay; camera = the projection/angle.
 
@@ -27,6 +27,15 @@ Choose **exactly one** primary `style_id` (optionally one named secondary influe
 - **`stylized_isometric_mmo`** — readable 2.5D/isometric multiplayer worlds.
 
 Avoid `cinematic_pbr_realism` for a small iOS team unless the game is intentionally sparse — highest asset, lighting, texture-memory, and animation burden.
+
+## Default `craft.finish` per preset
+
+`craft.finish` is ALWAYS set in the spec (skills branch on it). Defaults — override deliberately, e.g. a pure-2D game on a 3D-default preset sets `painterly_2d`:
+
+- `pixel`: **hd2d_pixel_fantasy**
+- `vector_flat`: **clean_graphic_casual**
+- `realistic_3d`: **cinematic_pbr_realism**
+- `stylized_3d`: all other presets (`painterly_cel_fantasy`, `heroic_handpainted_fantasy`, `stylized_isometric_mmo`, `anime_action_rpg`, `dark_gothic_fantasy`, `cozy_toy_diorama`, `lowpoly_atmospheric`, `soft_clay_character`, `stylized_scifi`)
 
 ## Per-style generation notes
 
@@ -57,7 +66,8 @@ Avoid `cinematic_pbr_realism` for a small iOS team unless the game is intentiona
 **Create a new visual family**
 ```
 Create the initial production art pack for {family_name}.
-First read Assets/GameArt/_ArtDirection/art-spec.yaml and inspect existing golden assets. Do not generate
+First read Assets/<Game>/Art/_ArtDirection/art-spec.yaml (probe legacy roots Assets/GameArt/ and Assets/Art/
+if absent) and inspect existing golden assets (conditioning.golden_assets). Do not generate
 production assets until you state the style, camera, palette, material grammar, and mobile budget you will preserve.
 Deliver in order: (1) a concise AssetFamilyBrief, (2) a Gemini style-anchor reference sheet, (3) one golden-asset
 beauty concept, (4) one golden-asset orthographic turnaround, (5) a Tripo-ready generation brief, (6) an optimized

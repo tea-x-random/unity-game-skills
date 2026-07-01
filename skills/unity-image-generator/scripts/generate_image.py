@@ -11,12 +11,25 @@ Generate images using Google's Gemini image API.
 
 Usage:
     uv run generate_image.py --prompt "your image description" --filename "output.png" [--resolution 1K|2K|4K] [--api-key KEY]
+
+Production calls run under the game's art-spec (docs/PIPELINE_CONVENTIONS.md):
+the script resolves art-spec.yaml (--art-spec, $UNITY_ART_SPEC, or canonical
+paths), injects its verbatim style paragraph + light direction into the prompt,
+and attaches its style-anchor images as reference inputs. Spec-less exploratory
+work must pass --no-art-spec explicitly.
+
+Multi-reference conditioning: --input-image/-i is repeatable; pair each with an
+--input-role ("character identity", "art style", ...). Roles are sent as
+interleaved text parts ("Image 1 = character identity.") — the Gemini API has
+no native role parameter.
 """
 
 import argparse
 import os
 import sys
 from pathlib import Path
+
+import art_spec as artspec
 
 
 # Default solid background used when asking the model for a keyable matte.
@@ -136,13 +149,39 @@ def main():
     )
     parser.add_argument(
         "--input-image", "-i",
-        help="Optional input image path for editing/modification"
+        action="append",
+        default=None,
+        help="Input image path for editing/reference conditioning; repeatable (canon sheet + style anchor + ...)"
+    )
+    parser.add_argument(
+        "--input-role",
+        action="append",
+        default=None,
+        help="Role label for the input image at the same position (e.g. 'character identity', 'art style'); repeatable"
     )
     parser.add_argument(
         "--resolution", "-r",
         choices=["1K", "2K", "4K"],
-        default="1K",
-        help="Output resolution: 1K (default), 2K, or 4K"
+        default=None,
+        help="Output resolution: 1K, 2K, or 4K. Default: auto from largest input image, else 1K. An explicit value always wins."
+    )
+    parser.add_argument(
+        "--art-spec",
+        help="Path to the governing art-spec.yaml (default: $UNITY_ART_SPEC or canonical Assets paths)"
+    )
+    parser.add_argument(
+        "--no-art-spec",
+        action="store_true",
+        help="Explicit override: run without an art-spec (exploratory/concept work only)"
+    )
+    parser.add_argument(
+        "--no-spec-anchors",
+        action="store_true",
+        help="Do not auto-attach the art-spec's conditioning.style_anchor_images"
+    )
+    parser.add_argument(
+        "--character",
+        help="Character id in the art-spec characters block: attaches its canon_sheet and injects its identity_string verbatim"
     )
     parser.add_argument(
         "--api-key", "-k",
@@ -178,6 +217,11 @@ def main():
 
     args = parser.parse_args()
 
+    # Resolve the governing art-spec (fail-unless---no-art-spec; see PIPELINE_CONVENTIONS.md).
+    spec, spec_path = artspec.resolve_or_fail(args.art_spec, args.no_art_spec)
+    if spec_path:
+        print(f"Using art-spec: {spec_path}")
+
     # Get API key
     api_key = get_api_key(args.api_key)
     if not api_key:
@@ -199,36 +243,107 @@ def main():
     output_path = Path(args.filename)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # Load input image if provided
-    input_image = None
-    output_resolution = args.resolution
-    if args.input_image:
-        try:
-            input_image = PILImage.open(args.input_image)
-            print(f"Loaded input image: {args.input_image}")
+    # Assemble the reference-input list: explicit --input-image paths (with
+    # their --input-role labels), the --character canon sheet, then the
+    # art-spec's style anchors (unless --no-spec-anchors).
+    input_specs: list[tuple[str, str | None]] = []
+    roles = args.input_role or []
+    for idx, path in enumerate(args.input_image or []):
+        input_specs.append((path, roles[idx] if idx < len(roles) else None))
 
-            # Auto-detect resolution if not explicitly set by user
-            if args.resolution == "1K":  # Default value
-                # Map input image size to resolution
-                width, height = input_image.size
-                max_dim = max(width, height)
-                if max_dim >= 3000:
-                    output_resolution = "4K"
-                elif max_dim >= 1500:
-                    output_resolution = "2K"
-                else:
-                    output_resolution = "1K"
-                print(f"Auto-detected resolution: {output_resolution} (from input {width}x{height})")
+    identity_string = None
+    if args.character:
+        if spec is None:
+            print("Error: --character requires a resolvable art-spec (characters block).", file=sys.stderr)
+            sys.exit(1)
+        entry = artspec.character_entry(spec, args.character)
+        if entry is None:
+            print(f"Error: character '{args.character}' not found in art-spec characters block.", file=sys.stderr)
+            sys.exit(1)
+        identity_string = entry.get("identity_string")
+        canon_sheet = entry.get("canon_sheet")
+        if canon_sheet:
+            resolved_sheet = artspec.resolve_project_path(str(canon_sheet), spec_path)
+            if not resolved_sheet.is_file():
+                # --character demands canon conditioning; a silently canon-less
+                # production call is invalid (see SKILL.md hard rule).
+                print(
+                    f"Error: canon_sheet for character '{args.character}' is declared in the "
+                    f"art-spec but missing on disk: {canon_sheet} (resolved: {resolved_sheet}). "
+                    "Regenerate/sync the canon sheet or fix the spec path before generating.",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+            if str(resolved_sheet) not in [p for p, _ in input_specs]:
+                input_specs.append((str(resolved_sheet), f"character identity canon sheet for {args.character}"))
+
+    if spec is not None and not args.no_spec_anchors:
+        declared_anchors = artspec.declared_style_anchors(spec)
+        resolved_anchors = artspec.style_anchor_images(spec, spec_path)
+        if declared_anchors and not resolved_anchors:
+            print(
+                "WARNING: the art-spec declares conditioning.style_anchor_images but NONE "
+                f"resolve to files on disk ({declared_anchors}). This call will attach ZERO "
+                "style-anchor conditioning images — production art generated without its "
+                "anchors is invalid. Fix the paths / regenerate the anchors, or pass "
+                "--no-spec-anchors to acknowledge explicitly.",
+                file=sys.stderr,
+            )
+        for anchor in resolved_anchors:
+            if anchor not in [p for p, _ in input_specs]:
+                input_specs.append((anchor, "art style anchor"))
+
+    input_images: list[tuple[object, str | None]] = []
+    for path, role in input_specs:
+        try:
+            img = PILImage.open(path)
+            input_images.append((img, role))
+            print(f"Loaded input image: {path}" + (f" (role: {role})" if role else ""))
         except Exception as e:
-            print(f"Error loading input image: {e}", file=sys.stderr)
+            print(f"Error loading input image {path}: {e}", file=sys.stderr)
             sys.exit(1)
 
-    # Build contents (image first if editing, prompt only if generating)
-    if input_image:
-        contents = [input_image, args.prompt]
+    # Resolution: explicit -r always wins; otherwise auto-detect from the
+    # largest input image; otherwise 1K. (The old code used '1K' as both the
+    # default and a legal explicit value, so an explicit '-r 1K' was
+    # indistinguishable from the default and hi-res inputs inflated output.)
+    if args.resolution is not None:
+        output_resolution = args.resolution
+    elif input_images:
+        max_dim = max(max(img.size) for img, _ in input_images)
+        if max_dim >= 3000:
+            output_resolution = "4K"
+        elif max_dim >= 1500:
+            output_resolution = "2K"
+        else:
+            output_resolution = "1K"
+        print(f"Auto-detected resolution: {output_resolution} (from largest input dim {max_dim})")
+    else:
+        output_resolution = "1K"
+
+    # Build the final prompt: user prompt + verbatim identity string + the
+    # art-spec's verbatim style paragraph (values transmitted, never invented).
+    prompt = args.prompt
+    if identity_string:
+        prompt += f"\n\nCHARACTER IDENTITY (frozen — copy exactly, vary only pose/action): {identity_string}"
+    if spec is not None:
+        prompt += "\n\n" + artspec.style_paragraph(spec)
+
+    # Build contents. Multiple inputs get role-interleaved text parts
+    # ("Image 1 = character identity.") — Gemini has no native role parameter.
+    if len(input_images) > 1:
+        contents = []
+        for n, (img, role) in enumerate(input_images, start=1):
+            contents.append(f"Image {n} = {role or 'reference'}.")
+            contents.append(img)
+        contents.append(prompt)
+        print(f"Editing with {len(input_images)} reference images at resolution {output_resolution}...")
+    elif input_images:
+        img, role = input_images[0]
+        contents = ([f"Image 1 = {role}.", img, prompt] if role else [img, prompt])
         print(f"Editing image with resolution {output_resolution}...")
     else:
-        contents = args.prompt
+        contents = prompt
         print(f"Generating image with resolution {output_resolution}...")
 
     try:

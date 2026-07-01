@@ -1,6 +1,6 @@
 ---
 name: unity-scene-composition
-description: "Define and enforce visual composition for Unity scenes before asset generation or world assembly: camera profile (orthographic/perspective, yaw, pitch, lens, framing), visual layers (background/far/mid/gameplay/foreground/UI), focal path, negative space, big-medium-small shape ratio, prop density, color zoning, occlusion budget, shadow/contact-darkening rules, prop-family distribution, and screenshot-based acceptance tests. Use when scenes are mechanically valid but visually weak, when building a BeautyCell/golden screen, when placing assets from the approved registry, when writing composition.yaml, when choosing foreground/midground/background roles, when setting camera/contracts for generated assets, or when level layout needs visual hierarchy beyond grid/board coordinates. Pairs with unity-game-layout (geometry/coordinate correctness), unity-asset-pipeline (approved registry + asset contracts), unity-art-direction (style_id + palette/material/camera intent), unity-graphics (lighting/render lock), and unity-ui-designer (UI safe area/readability)."
+description: "Define and enforce visual composition for Unity scenes before asset generation or world assembly: camera profile (orthographic/perspective, yaw, pitch, lens, framing), visual layers (background/far/mid/gameplay/foreground/UI), focal path, negative space, big-medium-small shape ratio, prop density, color zoning, occlusion budget, shadow/contact-darkening rules, prop-family distribution, the one-pixel-density law for sprite/2.5D scenes (ground texel size matches sprite pixel size, one light model across sprites and 3D ground), sprite-on-3D assembly (Y-axis-only billboarding, feet pivot, blob shadows, quarter-view framing), and the mandatory composed-scene acceptance pass (numeric budgets measured deterministically from scene data via MCP + scene-mode VLM critique). Use when scenes are mechanically valid but visually weak, when building a BeautyCell/golden screen, when placing assets from the approved registry, when writing composition.yaml, when choosing foreground/midground/background roles, when setting camera/contracts for generated assets, when sprites look pasted-on/floating/mismatched-chunkiness on a 3D ground, or when level layout needs visual hierarchy beyond grid/board coordinates. Pairs with unity-game-layout (geometry/coordinate correctness), unity-asset-pipeline (approved registry + asset contracts), unity-art-direction (style_id + palette/material/camera intent), unity-graphics (lighting/render lock), and unity-ui-designer (UI safe area/readability)."
 ---
 
 # Unity scene composition
@@ -11,13 +11,13 @@ This skill owns the **visual hierarchy contract** for scenes. `unity-game-layout
 
 ## Inputs
 
-- `Assets/GameArt/_ArtDirection/art-spec.yaml` (`unity-art-direction`) — style_id, palette, material, lighting, camera intent, mobile budgets.
-- `Assets/Art/Approved/registry.yaml` (`unity-asset-pipeline`) — approved prefabs and their composition roles/budgets.
+- `Assets/<Game>/Art/_ArtDirection/art-spec.yaml` (`unity-art-direction`) — style_id, craft block (`finish`, `pixels_per_unit`, `light_direction`), palette, material, lighting, camera intent, mobile budgets. (Canonical paths per `docs/PIPELINE_CONVENTIONS.md`; probe legacy roots `Assets/GameArt/` and `Assets/Art/` on existing projects.)
+- `Assets/<Game>/Art/Approved/registry.yaml` (`unity-asset-pipeline`) — approved prefabs and their composition roles/budgets (`composition.layer`, `visual_weight`, `density_cost`, `allowed_zones`, `target_screen_height_percent`).
 - Level/gameplay requirements (`unity-gameplay-systems`, `unity-game-layout`) — playable path, grid/board, interactables, spawn zones, UI safe area.
 
 ## Output: `composition.yaml`
 
-Create `Assets/GameArt/_ArtDirection/composition.yaml` from `references/composition-template.yaml`. It must define:
+Create `Assets/<Game>/Art/_ArtDirection/composition.yaml` from `references/composition-template.yaml`. Its `style_id` must equal the art-spec `style_id` verbatim, and `shadow_and_contact.key_light_direction` must equal art-spec `craft.light_direction` — string inequality is a validation failure. It must define:
 
 - **camera profile** — projection, yaw, pitch, lens/ortho size, framing, target device aspect;
 - **visual layers** — background, far, midground, gameplay, foreground, UI;
@@ -39,7 +39,10 @@ Create `Assets/GameArt/_ArtDirection/composition.yaml` from `references/composit
 5. **Zone color and contrast.** Reserve highest saturation/contrast for interactables, rewards, and focal accents. Backgrounds and filler props must recede.
 6. **Place only registry assets.** Read `unity-asset-pipeline` registry entries, filter by `composition.layer`, `visual_weight`, `allowed_zones`, and `density_cost`; never drag source art or unapproved prefabs into the scene.
 7. **Normalize scale + grounding.** Set target screen-height percent per role and apply one shared `shadow_profile`/contact-darkening rule. Foreground actors/props without a consistent contact shadow read as floating stickers.
-8. **Capture screenshots.** Use `unity-mcp-bridge` `manage_camera(screenshot)` or the BeautyCell renderer. Compare against the golden screen and run the checklist in `references/screenshot-acceptance.md`.
+8. **Capture screenshots + run the automated pass — mandatory on EVERY composed-scene screenshot.** Capture via `unity-mcp-bridge` `manage_camera(screenshot)` or the BeautyCell renderer, then split the check:
+   - **Numeric budgets are MEASURED from Unity scene data via MCP, never eyeballed and never VLM-scored:** sum registry `density_cost` of renderers in the gameplay-camera frustum vs `density_budget`; project renderer bounds to the viewport for foreground occlusion vs `occlusion_budget` and per-role screen-height % vs `shape_rhythm`; cross-check every visible renderer against `registry.yaml` (unmatched = unapproved unless flagged placeholder). Procedure + C# snippets: `references/scene-measurement.md`. A budget violation is a hard failure — fix per step 9.
+   - **The VLM scores only qualitative dimensions** (focal read, layer contrast, grounding, cohesion): `critique_image.py <screenshot> --scene-mode --subject "<scene intent>" --reference <golden screen> --art-spec <spec>` (`unity-image-generator`). During calibration, a low scene score triggers a re-roll or manual review — not a hard block.
+   Record both results per `references/screenshot-acceptance.md`.
 9. **Iterate by moving/removing first, not generating more.** If composition fails, fix camera, scale, contrast, density, and layering before generating additional assets.
 
 ## Layer rules
@@ -70,9 +73,28 @@ If a ground tile has the same bold black outline and hot accent palette as chara
 
 Every object that touches the world needs a consistent grounding treatment. Prefer a shared soft blob shadow or contact-AO prefab referenced by `shadow_profile`, with one global light/shadow direction. Do not rely on shadows baked into individual generated PNGs — they disagree once composited and break the BeautyCell.
 
+## One pixel density (Rule 0 — sprite and 2.5D scenes)
+
+The #1 amateur tell in sprite/2.5D scenes is mixing pixel resolutions: chunky point-filtered sprites standing on a smooth, high-res, bilinear ground. Each asset looks fine alone; the frame reads as two different games. Everything visible must share **one effective pixel size on screen**:
+
+- **Ground texel size == sprite pixel size.** Tile ground textures so `texels_per_unit = textureWidthPx / (groundWorldUnits / tiling)` ≈ the project PPU (`art-spec.yaml:craft.pixels_per_unit` — never a local value), then fine-tune by screenshot. (Verified: a 2816px texture on a 50-unit plane needed `mainTextureScale ≈ 3` to match 100-PPU sprites.) Measured check: `references/scene-measurement.md`.
+- **One filter mode.** Pixel track: point-filter EVERYTHING — sprites AND ground/tileset — mipmaps off. A bilinear ground under point sprites is the classic mismatch. (Import mechanics: `unity-pixel-art` / `unity-asset-pipeline`.)
+- **One light model across sprites and 3D ground.** If sprites are unlit (flat, bright), make the ground unlit too (URP/Unlit); never light one and not the other. Record the choice in `composition.yaml:pixel_density.light_model`.
+
+If a composed sprite scene "looks horrible," fix this before touching anything else.
+
+## Sprite-on-3D (2.5D) assembly
+
+For billboard sprites standing on 3D ground (Ragnarok/HD-2D look):
+
+- **Billboard Y-axis ONLY** — the sprite yaws to face the camera but stays upright (`LookRotation(horizontal_dir_to_camera, up)`); never pitch it toward the camera or sprites lie down as the camera tilts.
+- **Pivot at the feet** (bottom-center, from autocropped alpha — contract-enforced by `unity-asset-pipeline`) and place the actor at ground `y=0`, so the billboard rotates about the feet and stays planted.
+- **Soft blob shadow** quad on the XZ plane under every actor, sorted below the sprite, using the shared `shadow_profile` — without it billboards read as pasted-on stickers.
+- **Quarter-view framing:** orthographic camera, fixed downward pitch (~48°); the hero at ~25–30% of screen height — `orthographic_size ≈ heroWorldHeight / (2 × targetScreenFraction)` (keep it inside `shape_rhythm.target_screen_height_percent.hero`). Tight framing also hides ground-tiling repetition; a distant camera makes the hero a speck in wallpaper.
+
 ## Screenshot acceptance
 
-Do not rely on prose. A composition pass includes screenshots at the target device aspect plus at least one alternate aspect. Use `references/screenshot-acceptance.md` and record the screenshot paths in the BeautyCell or scene QA report. A scene that only passes in Scene View is not approved.
+Do not rely on prose. A composition pass includes screenshots at the target device aspect plus at least one alternate aspect, the deterministic scene measurement (`references/scene-measurement.md`), and the scene-mode VLM critique. Use `references/screenshot-acceptance.md` (measured gates vs scored dimensions) and record the screenshot paths + measurement JSON in the BeautyCell or scene QA report. A scene that only passes in Scene View is not approved.
 
 ## Relationship to other skills
 
@@ -81,3 +103,5 @@ Do not rely on prose. A composition pass includes screenshots at the target devi
 - `unity-art-direction`: global style/palette/material/camera intent; this skill turns it into screen-space rules.
 - `unity-graphics`: lighting/post/material implementation; this skill specifies what lighting must communicate.
 - `unity-ui-designer`: UI readability/safe area; this skill allocates UI's visual role in the whole frame.
+- `unity-pixel-art` / `unity-image-generator`: sprite production (transparency, pivots, import); this skill owns how those sprites sit in a scene (one pixel density, billboarding, grounding, framing) and the scene-mode critique gate.
+- `unity-2d-sprite-games` (genre layer, `~/.claude/skills`): routes sprite-game requests here for density/billboarding/grounding rules.

@@ -29,23 +29,29 @@ using UnityEngine;
 
 public static class ApplyAssetContract
 {
+    // settingsFromContract is built from the contract's import: block —
+    // filterMode (Point for pixel art, Bilinear for non-pixel rendered sprites),
+    // mipmaps, spriteMeshType, alphaIsTransparency, sprite mode. NEVER hardcode
+    // these here; a hardcoded FilterMode blurs pixel art or crunches painterly art.
     public static void ApplySpriteImport(
         string assetPath,
-        float pixelsPerUnit,
+        float pixelsPerUnit,                              // art-spec craft.pixels_per_unit (project PPU SSOT)
         TextureImporterSettings settingsFromContract,
+        TextureImporterCompression defaultCompression,    // contract import.compression (Uncompressed for pixel art)
         int maxTextureSize,
         TextureImporterFormat iosFormat)
     {
         var ti = AssetImporter.GetAtPath(assetPath) as TextureImporter;
         if (ti == null) throw new System.Exception($"No TextureImporter at {assetPath}");
 
-        ti.textureType = TextureImporterType.Sprite;
-        ti.spriteImportMode = SpriteImportMode.Single;
-        ti.spritePixelsPerUnit = pixelsPerUnit;
-        ti.alphaIsTransparency = true;
-        ti.mipmapEnabled = false;
-        ti.filterMode = FilterMode.Bilinear;
-        ti.spriteMeshType = SpriteMeshType.Tight;
+        settingsFromContract.textureType = TextureImporterType.Sprite;
+        settingsFromContract.spritePixelsPerUnit = pixelsPerUnit;
+        ti.SetTextureSettings(settingsFromContract);      // apply the contract, not Unity defaults
+
+        // Default platform too — an iOS-only override leaves the editor/Android
+        // import drifting from the contract.
+        ti.textureCompression = defaultCompression;
+        ti.maxTextureSize = maxTextureSize;
 
         ti.SetPlatformTextureSettings(new TextureImporterPlatformSettings {
             name = "iPhone",
@@ -57,18 +63,37 @@ public static class ApplyAssetContract
 
         EditorUtility.SetDirty(ti);
         ti.SaveAndReimport();
-        ValidateSpriteImport(assetPath, pixelsPerUnit, maxTextureSize);
+        ValidateSpriteImport(assetPath, pixelsPerUnit, settingsFromContract, defaultCompression, maxTextureSize, iosFormat);
     }
 
-    static void ValidateSpriteImport(string assetPath, float ppu, int maxSize)
+    static void ValidateSpriteImport(
+        string assetPath,
+        float ppu,
+        TextureImporterSettings expected,
+        TextureImporterCompression expectedCompression,
+        int maxSize,
+        TextureImporterFormat expectedIosFormat)
     {
         var ti = AssetImporter.GetAtPath(assetPath) as TextureImporter;
         if (ti.textureType != TextureImporterType.Sprite) throw new System.Exception("textureType mismatch");
-        if (ti.spriteImportMode != SpriteImportMode.Single) throw new System.Exception("spriteImportMode mismatch");
+        if (ti.spriteImportMode != (SpriteImportMode)expected.spriteMode) throw new System.Exception("spriteImportMode mismatch");
         if (Mathf.Abs(ti.spritePixelsPerUnit - ppu) > 0.01f) throw new System.Exception("PPU mismatch");
-        if (ti.mipmapEnabled) throw new System.Exception("mipmaps must be off for 2D sprites/UI");
+        if (ti.filterMode != expected.filterMode) throw new System.Exception($"filterMode mismatch: realized {ti.filterMode}, contract {expected.filterMode}");
+        if (ti.mipmapEnabled != expected.mipmapEnabled) throw new System.Exception("mipmap mismatch vs contract");
+        if (ti.textureCompression != expectedCompression) throw new System.Exception("default-platform compression mismatch vs contract");
+
         var ios = ti.GetPlatformTextureSettings("iPhone");
         if (!ios.overridden || ios.maxTextureSize > maxSize) throw new System.Exception("iOS texture settings mismatch");
+        // GetPlatformTextureSettings returns the REQUESTED format. Assert the
+        // realized format: GetAutomaticFormat for Automatic, otherwise the request.
+        var realized = ios.format == TextureImporterFormat.Automatic
+            ? ti.GetAutomaticFormat("iPhone")
+            : ios.format;
+        if (realized != expectedIosFormat) throw new System.Exception($"iOS format mismatch: realized {realized}, contract {expectedIosFormat}");
+        // Belt-and-braces: the imported Texture2D.format reflects the ACTIVE build
+        // target's realized format — record it in the import QA report.
+        var tex = AssetDatabase.LoadAssetAtPath<Texture2D>(assetPath);
+        if (tex == null) throw new System.Exception("imported Texture2D missing");
     }
 }
 ```
@@ -188,20 +213,62 @@ public static class CompareReferenceFrames
 
 ## 6) BakeModelToAtlas pattern
 
-For pre-rendered 3D → 2D sprites, create a bake scene with one camera, one lighting rig, one material profile, transparent clear color, and a turntable/animation sampler. Output to PNG atlas; then run `validate_sprite.py --require-alpha` and import with `SpriteImportMode.Multiple`.
+For pre-rendered 3D → 2D sprites, create a bake scene with one camera, one lighting rig, one material profile, transparent clear color, and a turntable/animation sampler. Output to PNG atlas; then run `validate_sprite.py --require-alpha --art-spec <spec>` (fails without a resolvable art-spec; `--no-art-spec` only for exploratory bakes) and import with `SpriteImportMode.Multiple`.
 
 ## 7) Import presets + AssetPostprocessor (make correct import the default)
 
 Do not rely on each agent remembering import settings. Create project presets such as:
 
 ```
-Assets/Art/ImportPresets/Sprite_Foreground.preset
-Assets/Art/ImportPresets/Sprite_BackgroundTile.preset
-Assets/Art/ImportPresets/UI_Icon.preset
-Assets/Art/ImportPresets/Texture_TilingMaterial.preset
+Assets/<Game>/Art/ImportPresets/Sprite_Foreground.preset
+Assets/<Game>/Art/ImportPresets/Sprite_BackgroundTile.preset
+Assets/<Game>/Art/ImportPresets/UI_Icon.preset
+Assets/<Game>/Art/ImportPresets/Texture_TilingMaterial.preset
 ```
 
-Then use an `AssetPostprocessor` to route imports by folder/contract. The postprocessor should apply the preset first, then override contract-specific values (PPU, max size, platform format, secondary textures, atlas group metadata). Pattern:
+Then use an `AssetPostprocessor` to route imports by folder/contract. The postprocessor should apply the preset first, then override contract-specific values (PPU, max size, platform format, secondary textures, atlas group metadata).
+
+The sprite PPU comes from the project PPU SSOT (`art-spec.yaml: craft.pixels_per_unit`) — never a hardcoded number. Small cached reader:
+
+```csharp
+using System.IO;
+using System.Text.RegularExpressions;
+
+public static class ProjectArtSpec
+{
+    static float? _ppu;
+    static bool _warned;
+    // Nullable on purpose: an AssetPostprocessor has no --no-art-spec escape hatch,
+    // so a missing spec must NOT throw on every pre-spec/exploratory import. It warns
+    // once and leaves Unity defaults; the HARD production gates stay with
+    // validate_asset_manifest.py + the ApplySpriteImport contract validator.
+    public static float? PixelsPerUnitOrNull
+    {
+        get
+        {
+            if (_ppu.HasValue) return _ppu;
+            // Canonical: Assets/<Game>/Art/_ArtDirection/art-spec.yaml (legacy roots
+            // Assets/GameArt/ and Assets/Art/ are reserved aliases — probe all).
+            foreach (var specPath in Directory.GetFiles("Assets", "art-spec.yaml", SearchOption.AllDirectories))
+            {
+                var m = Regex.Match(File.ReadAllText(specPath), @"pixels_per_unit:\s*([0-9.]+)");
+                if (m.Success) { _ppu = float.Parse(m.Groups[1].Value); return _ppu.Value; }
+            }
+            if (!_warned)
+            {
+                _warned = true;
+                UnityEngine.Debug.LogWarning(
+                    "No art-spec craft.pixels_per_unit found — sprite imported with Unity-default PPU. " +
+                    "Fine for pre-spec/exploratory art only; production imports require the spec " +
+                    "(one game = one PPU; validate_asset_manifest.py enforces it).");
+            }
+            return null;
+        }
+    }
+}
+```
+
+Routing pattern — note tilemap tiles and backgrounds are SPRITES and MUST share the project PPU (a `Default`-typed tile texture gets no PPU at all and the scene mixes pixel densities); reserve `Default`+`Repeat` for true tiling material textures only:
 
 ```csharp
 using UnityEditor;
@@ -210,21 +277,24 @@ public sealed class ArtAssetPostprocessor : AssetPostprocessor
 {
     void OnPreprocessTexture()
     {
-        if (!assetPath.StartsWith("Assets/Art/")) return;
+        if (!assetPath.StartsWith("Assets/") || !assetPath.Contains("/Art/")) return;
         var ti = (TextureImporter)assetImporter;
 
-        if (assetPath.Contains("/Tiles/") || assetPath.Contains("/Background/"))
+        if (assetPath.Contains("/Materials/") || assetPath.Contains("/TilingTextures/"))
         {
+            // True tiling/material textures only (no PPU concept).
             ti.textureType = TextureImporterType.Default;
             ti.wrapMode = UnityEngine.TextureWrapMode.Repeat;
             ti.mipmapEnabled = true;
         }
-        else if (assetPath.Contains("/Sprites/") || assetPath.Contains("/Approved/"))
+        else if (assetPath.Contains("/Tiles/") || assetPath.Contains("/Background/")
+              || assetPath.Contains("/Sprites/") || assetPath.Contains("/Approved/"))
         {
             ti.textureType = TextureImporterType.Sprite;
             ti.alphaIsTransparency = true;
             ti.mipmapEnabled = false;
-            ti.spritePixelsPerUnit = 100;
+            var ppu = ProjectArtSpec.PixelsPerUnitOrNull;          // art-spec SSOT, never hardcoded
+            if (ppu.HasValue) ti.spritePixelsPerUnit = ppu.Value;  // no spec yet: warn once, keep Unity default
         }
     }
 }
@@ -293,8 +363,8 @@ If the game uses URP 2D Renderer / Sprite-Lit materials, contracts must record s
 
 ```yaml
 secondary_textures:
-  normal_map: Assets/Art/Approved/tree/tree_n.png
-  mask_map: Assets/Art/Approved/tree/tree_mask.png
+  normal_map: Assets/<Game>/Art/Approved/tree/tree_n.png
+  mask_map: Assets/<Game>/Art/Approved/tree/tree_mask.png
 ```
 
 Gate before approval:

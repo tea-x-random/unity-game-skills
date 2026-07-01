@@ -27,7 +27,7 @@ This is the **production-engineering / DevOps hygiene** discipline. It is distin
 
 1. **Source control first.** Add the Unity `.gitignore` and `.gitattributes` (+ Git LFS) **before** the first asset commit. Copy both from `references/gitignore-and-lfs.md`.
 2. **Editor settings.** Set Asset Serialization = **Force Text**, Version Control = **Visible Meta Files**, configure **Smart Merge** (UnityYAMLMerge). Commit `ProjectSettings/`.
-3. **Folder structure.** Create `Assets/<Game>/` with the standard subfolders; keep generated/third-party separate.
+3. **Folder structure.** Create `Assets/<Game>/` with the standard subfolders; keep generated/third-party separate. Provision the reserved art-pipeline paths with `.gitkeep` files (below).
 4. **Assembly architecture.** Lay down Core / Game / Editor / Tests asmdefs (engine-free Core first).
 5. **Package management.** Pin versions in `manifest.json`, add OpenUPM scoped registries as needed, commit `packages-lock.json`.
 6. **Versioning.** Decide bundleVersion + build-number scheme; add the build-number bump (hand iOS signing/upload to `unity-qa-release` fastlane).
@@ -53,6 +53,9 @@ Assets/
   <Game>/                 # everything you author lives under one namespace-like root
     Scripts/              # C# (mirrors the asmdef layout: Core/, Game/, Editor/, Tests/)
     Art/                  # Textures, Sprites, Materials, Models  (LFS-tracked)
+      _ArtDirection/      # RESERVED: art-spec.yaml, style-guide.md, palettes/, references/, sheets/
+      Approved/           # RESERVED: registry.yaml + <asset_id>/ (contract + approved art + QA reports)
+      Source/             # RESERVED: raw generated staging — SourceImages/, TripoRaw/, CleanupQueue/, QA/
     Audio/                # Music, SFX  (LFS-tracked)
     Prefabs/
     Scenes/               # Boot, Game, plus additive feature scenes
@@ -68,6 +71,21 @@ Build/                    # gitignored output (Build/iOS/ is the Xcode export)
 ```
 
 Rationale: a single `Assets/<Game>/` root makes "what we wrote" vs "what we imported" obvious, keeps reorg cheap (one move, not a scatter), and lets `.gitignore`/LFS rules target predictable paths.
+
+### Reserved art-pipeline paths (provision at setup)
+
+The art pipeline (`unity-art-direction` → `unity-asset-pipeline`) resumes across sessions only if its artifact paths are deterministic — `unity-game-director`'s detect probe looks for them. Provision them empty at setup, with `.gitkeep` files so the dirs survive git:
+
+```bash
+mkdir -p "Assets/<Game>/Art/_ArtDirection"/{palettes,references,sheets} \
+         "Assets/<Game>/Art/Approved" \
+         "Assets/<Game>/Art/Source"/{SourceImages,TripoRaw,CleanupQueue,QA}
+find "Assets/<Game>/Art" -type d -empty -exec touch {}/.gitkeep \;
+```
+
+- Canonical artifact paths: art-spec `Assets/<Game>/Art/_ArtDirection/art-spec.yaml`; master palette `_ArtDirection/palettes/master-palette.png`; canon sheets `_ArtDirection/sheets/<char_id>_canon.png` (skeleton templates `*.skeleton.json` beside them); registry `Assets/<Game>/Art/Approved/registry.yaml`.
+- This nests the whole art tree under the single `Assets/<Game>/` root — the one-root doctrine holds; never invent a new root for art output.
+- **Legacy reserved aliases:** older skill docs use `Assets/GameArt/` and `Assets/Art/` roots. Discovery/resume tooling MUST probe them too, but NEW artifacts are written to the canonical layout only. Unifying legacy references is follow-up polish, not a setup blocker.
 
 ## Assembly definition (asmdef) architecture
 
@@ -148,6 +166,7 @@ Keep secrets out of CI logs, cache `Library/` between runs to speed builds, and 
 - **`unity-mcp-bridge`** is the Editor automation layer (apply settings, add packages, drive the headless build); this skill defines *what* to set, the bridge executes it.
 - **`unity-monetization` / `unity-analytics-liveops`** supply the per-environment SDK keys/secrets this skill keeps out of the repo and injects via CI.
 - **`unity-ios-secure-backend`** shares the secrets stance (signing/identity creds, server keys) — same "never in the repo" rule.
+- **`unity-art-direction` / `unity-asset-pipeline`** own the art-spec SSOT (`_ArtDirection/art-spec.yaml`) and the approved-asset registry (`Approved/registry.yaml`) that live in the reserved `Assets/<Game>/Art/{_ArtDirection,Approved,Source}` paths this skill provisions — deterministic paths are what make cross-session art resume (the `unity-game-director` detect probe) work.
 
 ## Common failure modes
 

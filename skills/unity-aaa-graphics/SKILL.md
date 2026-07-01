@@ -50,9 +50,9 @@ Example for **tower defense** — all of these are "generate," not "fill with gr
 ### 3. Generate with AAA prompts (load `unity-pixel-art` / `unity-image-generator` / `unity-3d-generator`)
 Use the **prompt template and genre exemplar prompts** in `references/prompt-library.md` — not one-line prompts. Generate environment textures/tilesets and props, condition each on the style sheet, and run the refine loop until each asset clears the per-asset rubric. Import with correct settings (Sprite/Texture, ASTC, atlas) per the generator skills.
 
-**Generate per layer, not one intensity for everything.** The same "bold saturated thick black outline" tokens that make a hero asset readable can destroy a ground tile: the ground becomes a noisy foreground subject and the characters stop popping. Background/ground prompts should usually say: low contrast, lower saturation, sparse subtle detail, thin/no outline, recessive surface, NOT busy, NOT focal. Validate with `unity-image-generator/scripts/validate_sprite.py --tile --square --power-of-two` and `critique_image.py --role background_tile --must-recede`.
+**Generate per layer, not one intensity for everything.** The same "bold saturated thick black outline" tokens that make a hero asset readable can destroy a ground tile: the ground becomes a noisy foreground subject and the characters stop popping. Background/ground prompts should usually say: low contrast, lower saturation, sparse subtle detail, thin/no outline, recessive surface, NOT busy, NOT focal. Validate with `unity-image-generator/scripts/validate_sprite.py --tile --square --power-of-two --art-spec <spec>` and `critique_image.py --role background_tile --must-recede --art-spec <spec>` (both scripts FAIL without a resolvable art-spec; exploratory concepts must pass `--no-art-spec` explicitly).
 
-**Run subject-correctness QA.** A generated image can be attractive and still semantically wrong (e.g. "mossy rock" rendered as a planet/globe). Use `critique_image.py --subject "<exact intended subject>"`; any subject score ≤1 blocks import. Pixel/alpha QA cannot catch this.
+**Run subject-correctness QA.** A generated image can be attractive and still semantically wrong (e.g. "mossy rock" rendered as a planet/globe). Use `critique_image.py --subject "<exact intended subject>" --art-spec <spec>` (`--no-art-spec` only for spec-less exploration); any subject score ≤1 blocks import. Pixel/alpha QA cannot catch this.
 
 ### 4. Light, finish, and compose the scene (load `unity-graphics`)
 Apply the render pipeline — this is what turns flat sprites into a lit scene: URP set up, a real lighting setup (not uniform flat), soft shadows/AO where it reads, a designed backdrop or gradient (not a hard oval), mobile-safe post (subtle bloom/vignette/color grade), and depth cues (fog/parallax/scale). Build forms + palette + lighting first; add post last.
@@ -66,7 +66,9 @@ Short, additive particle/feedback bursts (place, hit, wave-clear, win) lift perc
 
 ## Visual scorecard gate
 
-Capture a real device-resolution screenshot via MCP and score 1–10 on each axis. **Any axis ≤ 4 is an automatic fail → fix and re-shoot.** Target an ~8/10 average before "done." **Every axis is judged against the TARGET style, not against "more rendering."** For a flat/minimal target, "passing" means *intentional and cohesive at that fidelity* — gradients and AO are not required and may be wrong.
+**Authority: this scorecard is the FINAL whole-screen visual gate.** `unity-art-direction`'s 0–2 gates are the per-asset gate feeding it (assets must pass those first), and `unity-game-director`'s Step 2.6 rubric is superseded once an approved `art-spec.yaml` exists. Every axis is judged against that spec.
+
+Capture a real device-resolution screenshot via MCP and score 1–10 on each axis. Machine-assist the whole-screen judgment with `critique_image.py --scene-mode --subject "<scene intent>" --reference <golden_screen> --art-spec <spec>` (`unity-image-generator`) — the scene-mode rubric scores focal read, layer contrast, grounding, and cohesion; numeric density/occlusion/screen-height budgets are measured from scene data via MCP per `unity-scene-composition`, never eyeballed. **Any axis ≤ 4 is an automatic fail → fix and re-shoot.** Target an ~8/10 average before "done." **Every axis is judged against the TARGET style, not against "more rendering."** For a flat/minimal target, "passing" means *intentional and cohesive at that fidelity* — gradients and AO are not required and may be wrong.
 
 | Axis | Passing looks like |
 |------|--------------------|
@@ -80,9 +82,11 @@ Capture a real device-resolution screenshot via MCP and score 1–10 on each axi
 | **Grounding** | Props/characters sit in the world via consistent contact shadow/AO; no floating stickers |
 | **Readability** | Gameplay-critical elements (path, towers, enemies, the board/grid) pop against their ground |
 | **HUD/UI quality** | Designed readouts/buttons, on-theme — not default labels on flat bars |
+| **Characters on-model** | Every recurring character matches its canon sheet (art-spec `characters.<id>.canon_sheet`): silhouette, proportions, palette. Verify with `critique_image.py --reference <canon_sheet>` on a crop of the character, not eyeball-only |
+| **Pixel density** | ONE pixel density across the screen — one project PPU (art-spec `craft.pixels_per_unit`); sprite pixels and ground/tile texels are the same world size. No mixels, no mixed-resolution art pasted together |
 | **Animation** | Assets that act are animated (idle/move/attack/hit/death as needed); actions fire gameplay on the correct frame — nothing static where motion is expected |
 
-Auto-fail anti-patterns (ship-blockers): *placeholder* solid-color ground used because no art was made (≠ an intentional flat-design fill); procedural blobs for primary surfaces; one generated asset amid untextured everything-else; busy/high-contrast ground with the same outline/saturation as heroes; attractive but wrong-subject asset; over-rendered glossy gradients when the locked finish is flat/cel; floating sticker props with no contact shadow; hard-oval vignette as the only "lighting" on a style that wanted real lighting; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame.
+Auto-fail anti-patterns (ship-blockers): *placeholder* solid-color ground used because no art was made (≠ an intentional flat-design fill); procedural blobs for primary surfaces; one generated asset amid untextured everything-else; busy/high-contrast ground with the same outline/saturation as heroes; attractive but wrong-subject asset; over-rendered glossy gradients when the locked finish is flat/cel; floating sticker props with no contact shadow; hard-oval vignette as the only "lighting" on a style that wanted real lighting; static asset where motion is expected (no idle/attack/death); projectile/damage firing on input instead of the animation's release/contact frame; mixed pixel densities on one screen (mixels); a recurring character visibly off its canon sheet.
 
 ## Where this sits
 

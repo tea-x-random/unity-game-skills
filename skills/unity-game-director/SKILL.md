@@ -23,7 +23,7 @@ Run the detection probe before planning. Branch all engine guidance on the detec
 bash ~/.claude/skills/unity-game-director/scripts/detect_unity_project.sh
 ```
 
-It reports: Unity project yes/no, `m_EditorVersion` from `ProjectSettings/ProjectVersion.txt`, render pipeline, key packages (Input System, Addressables, URP, Cinemachine, glTFast, Test Framework), and iOS build target presence.
+It reports: Unity project yes/no, `m_EditorVersion` from `ProjectSettings/ProjectVersion.txt`, render pipeline, key packages (Input System, Addressables, URP, Cinemachine, glTFast, Test Framework), iOS build target presence, and the art-pipeline artifacts (`art-spec.yaml` / `composition.yaml` / `registry.yaml` / canon-sheet count) with an `ART_PIPELINE=RESUME|FRESH` verdict. On RESUME, resume from the found artifacts — never re-derive style or regenerate approved assets (see Phase Routing).
 
 **Version gate (critical):** the model's built-in Unity knowledge is roughly Unity 2022.3 / early Unity 6.0. For Unity 6 (6000.x) the Input System, UI Toolkit, DOTS, RenderGraph, and Build Profiles differ, and the **6.1–6.5 tech-stream** (6000.1–6000.5) moves further: hard-obsoleted APIs (e.g. IMGUI `TreeView` became generic in 6.5), new core packages (Serialization is core in 6.5), expanded 2D physics worlds, etc. So when on Unity 6.x:
 
@@ -116,7 +116,7 @@ This is the standard "prototype the riskiest thing first / find the fun before y
 
 ## Step 2.6 — Aesthetic direction is a first-class EARLY deliverable
 
-A reference casual game's look churned through many passes (several distinct directions and multiple palette/typography reworks; glossy buttons → flat and back) because no named visual target was agreed up front — every pass was a fresh guess at "what does *pleasing* mean here." Fix: pin the aesthetic target as an explicit deliverable at concept time, the same way you pin gameplay scope, then converge in **1–2 passes** with a rubric and screenshots instead of many. Most designs converge within two iterations *when there is a target to converge toward* ([design review iteration](https://www.markup.io/blog/design-review-checklist/)). For a structured way to capture this north-star, route to `unity-art-direction`, which records it as a locked, machine-readable `art-spec.yaml` single-source-of-truth (style preset, palette, materials, lighting, scale, mobile budgets, acceptance), then route to `unity-scene-composition` for `composition.yaml` and `unity-asset-pipeline` for asset contracts/registry before any art is mass-generated.
+A reference casual game's look churned through many passes (several distinct directions and multiple palette/typography reworks; glossy buttons → flat and back) because no named visual target was agreed up front — every pass was a fresh guess at "what does *pleasing* mean here." Fix: pin the aesthetic target as an explicit deliverable at concept time, the same way you pin gameplay scope, then converge in **1–2 passes** with a rubric and screenshots instead of many. Most designs converge within two iterations *when there is a target to converge toward* ([design review iteration](https://www.markup.io/blog/design-review-checklist/)). **Mandatory before ANY production asset:** route to `unity-art-direction`, which records the north-star as a locked, machine-readable `art-spec.yaml` single source of truth (canonical path `Assets/<Game>/Art/_ArtDirection/art-spec.yaml`: style preset, palette, materials, lighting, scale, mobile budgets, acceptance) and gets it user-approved. Exploratory concepts/style boards may precede the spec; production art may not. Then follow the ordered Phase Routing DAG: `unity-asset-designer` (character canon), `unity-scene-composition` (`composition.yaml`), `unity-asset-pipeline` (contracts/registry) before any art is mass-generated. Record the art-spec path + approval status in the ledger. This gate applies to art only — it never blocks gray-box gameplay prototyping.
 
 1. **Agree a named visual north-star up front (a genuine branch point — ask the user).** Capture it in the ledger as a short, concrete art-direction statement, not an adjective:
    - **Reference style:** a named style + 1–2 real touchstones — pick what fits your game, with no single style as the default (e.g. flat-pastel à la *Two Dots* / *I Love Hue*, glossy candy à la *Royal Match*, minimal ink, or neon-retro). A mood board / reference set is the standard alignment tool — it pins tone, palette, and texture before any asset is made and prevents exactly this kind of churn ([Milanote — game design mood board](https://milanote.com/guide/game-design-moodboard); [Numberanalytics — mood boards in game art](https://www.numberanalytics.com/blog/ultimate-guide-mood-boards-game-art)).
@@ -132,8 +132,9 @@ A reference casual game's look churned through many passes (several distinct dir
    - **Finish consistency** (every element flat *or* every element glossy — never mixed; this was the reference project's recurring slip)
    - **Cohesion with the north-star** (would a stranger name the agreed reference style from this screenshot?)
    - Gate: do not call visuals "done" below the agreed bar (the reference project used an ~8/10 average). Converge in 1–2 passes; if you're on pass 3+, the north-star wasn't concrete enough — go back to step 1, don't keep guessing.
+   - **Scorecard precedence:** this rubric applies only until an `art-spec.yaml` exists — then it is SUPERSEDED: per-asset acceptance is `unity-art-direction`'s 0–2 quality gates, and the FINAL whole-screen authority is the `unity-aaa-graphics` visual scorecard. One hierarchy, no dueling gates.
 
-3. **Single source of truth for the palette/theme** so passes don't regress: keep theme values in code (e.g. a `GameTheme.cs` defaults), and delete any `Resources/*Theme.asset` that would shadow them with stale serialized values (a real bug from a reference project — the asset overrode the updated `.cs` palette).
+3. **Runtime theme = a DERIVED view of `art-spec.yaml`** so passes don't regress: keep runtime theme values in code (e.g. a `GameTheme.cs` defaults) as the runtime SSOT *derived from* the art-spec — its color hexes must equal the art-spec palette hexes (`palette.roles` + arrays), never hand-invented. Delete any `Resources/*Theme.asset` that would shadow them with stale serialized values (a real bug from a reference project — the asset overrode the updated `.cs` palette).
 
 4. **Menu & text consistency** is owned by `unity-ui-designer` (recurring menu/typography drift was fixed there — display-name single-sourcing, safe-area, TMP font setup, 44pt targets). Cross-reference it from the orchestration checklist below; do not re-derive UI rules here.
 
@@ -166,26 +167,50 @@ bash ~/.claude/skills/unity-game-director/scripts/probe_asset_credentials.sh
 
 **Allowed skips** (the only valid reasons to ship a surface without real art): user explicitly asked offline-only, the probe shows the key `MISSING`, a real API/quota error with the command shown, or a repeated low-value prop better done procedurally / by atlas instancing.
 
-## Phase Routing
+## Phase Routing — the ordered pipeline (DAG, gated)
 
-- `unity-gameplay-systems`: first playable slice, project/scene setup, C# (cache `GetComponent` in `Awake`; Input System not legacy `Input`; pooling; no allocations in `Update`; `[SerializeField] private`; asmdefs), entity/state systems, camera, controls, scoring, difficulty, game feel. 2D and 3D casual templates.
-- External asset sourcing: credential probe, generator skill loading, source decision, task IDs / output files or blocker evidence. Must complete before graphics is "done" for premium visual claims.
-- `unity-pixel-art`: PixelLab final pixel-native sprites, tilesets, directional sheets, icons, and animation strips; Gemini can explore concepts first, but final pixels come from PixelLab and import with Point/no compression/pixel-perfect settings.
-- `unity-3d-generator`: Tripo text/image→3D, texture, auto-rig, animation, conversion, GLB/FBX → write into `Assets/`, import, configure import settings; also non-pixel pre-rendered 2D when useful.
-- `unity-image-generator`: STATIC non-pixel 2D art and Gemini exploration — UI art, backgrounds, icons, textures, concepts, and high-quality reference images that condition Tripo or PixelLab. Pixel-art finals route to `unity-pixel-art`; non-pixel animated/motion assets route to `unity-3d-generator` plus `unity-animation`, not frame-by-frame Gemini.
-- `unity-audio-generator`: SFX, loops/music, UI sounds, voice/TTS → import as AudioClips.
-- `unity-graphics`: basic-looking scenes → URP setup, lighting, materials, mobile-safe post, visual quality.
-- `unity-aaa-graphics`: premium/AAA visual upgrades — art-direction critique, mandatory per-surface asset sourcing, AAA prompt library + genre art kits, render polish, and a visual scorecard gate that fails flat/programmer-art scenes. Route here for any "make it look good / premium / looks basic" request.
-- `unity-art-direction`: the structured art-direction system — establish/approve a locked `art-spec.yaml` (style preset, palette, materials, lighting, scale, mobile budgets, acceptance), then run the golden-asset/family production pipeline with quality-gate scoring. Use at concept time to lock the visual language before mass-generating art.
-- `unity-animation`: AAA gameplay-synced animation (2D sprite or 3D skeletal) — per-role clip catalog (idle/move/attack/hit/death, tower idle/aim/fire), Animator wiring, and Animation Events that fire gameplay on the correct frame. Every asset that acts must be animated.
-- `unity-analytics-liveops`: analytics & retention instrumentation (D1/D7/D30, ARPDAU funnels), remote config + A/B testing, crash/analytics SDKs, soft-launch measurement, iOS ATT/SKAdNetwork/AdAttributionKit and privacy-manifest coordination — the levers that turn a playable game into a retentive, monetizable one.
-- `unity-ui-designer`: HUD, menus, overlays, pause/win/lose, settings, responsive + safe-area touch UI. **Owns menu & text consistency** (label single-sourcing, TMP font setup, typography scale, no-tofu) — route all recurring menu/text-drift issues here rather than fixing them ad hoc.
+Route phases in this order. Each art phase has required INPUT/OUTPUT artifacts and a GATE that must pass before the next art phase. **Gates apply to ART production and scene ART assembly ONLY** — per Core Doctrine #1, gray-box gameplay is NEVER blocked on art: from step 0, `unity-gameplay-systems` (+ `unity-game-layout` for boards, `unity-game-economy` at design time) prototypes the loop in parallel with primitives flagged as placeholders in the ledger.
+
+**RESUME rule:** when `detect_unity_project.sh` reports existing artifacts (`ART_PIPELINE=RESUME`), resume from them — never re-derive style, never regenerate an approved asset, never rewrite an approved art-spec unless the user asks.
+
+0. **`unity-project-setup`** — source control, folders/asmdefs, packages, secrets, CI. Provisions the reserved art paths (`Assets/<Game>/Art/{_ArtDirection,Approved,Source}`) so every later artifact has a deterministic home.
+   ∥ *Parallel gray-box track starts here and never waits on art.*
+1. **Director Steps 2.5–2.6** — novel-mechanic scoping + aesthetic north-star. OUT: north-star statement in the ledger.
+2. **`unity-art-direction`** — OUT: `Assets/<Game>/Art/_ArtDirection/art-spec.yaml` + `palettes/master-palette.png`; derived views (`style-guide.md`, `GameTheme.cs` hexes, UI tokens) regenerated FROM it. **GATE: art-spec approved by the user. No production asset before this.**
+3. **`unity-asset-designer`** — IN: approved art-spec. OUT: canon per recurring character (`_ArtDirection/sheets/<char_id>_canon.png`, registered in the art-spec `characters` block); game golden anchor approved, then family goldens derived from it. **GATE (track-aware): canon exists per recurring character — pixel track: a PixelLab anchor/reference sheet; non-pixel 2D & 3D: a Gemini turnaround sheet.**
+4. **`unity-scene-composition`** — IN: art-spec. OUT: `composition.yaml` agreeing with it (same `style_id`; `key_light_direction` equals `craft.light_direction`).
+5. **Generators** — IN: art-spec (pass `--art-spec`) + conditioning artifacts (golden anchor, master palette, canon sheets); NO hand-typed style. Credential probe first (Visual Quality Gate above). `unity-pixel-art` (pixel finals, bitforge on the golden anchor, palette on every call) · `unity-image-generator` (static non-pixel 2D, canon/style refs attached; concepts for the others) · `unity-3d-generator` (image→3D from style-locked turnarounds only) · `unity-audio-generator` (SFX/music/TTS → AudioClips).
+6. **Per-asset QA** — deterministic checks first (validate_sprite, palette/alpha/scale), VLM critique second; per the generator skills' gates.
+7. **`unity-asset-pipeline`** — IN: QA-passed source + art-spec. OUT: asset-contract → prefab factory → **approved registry** (`Assets/<Game>/Art/Approved/registry.yaml`). **GATE: `validate_asset_manifest.py` exit 0.**
+8. **Scene ART assembly** — `unity-gameplay-systems` + `unity-scene-composition` + `unity-game-layout` place visible art **from the registry ONLY** (logic prefabs may wrap registry assets); PPU read from art-spec.
+9. **Whole-screen gate** — `unity-aaa-graphics` scorecard on real Play-Mode screenshots = FINAL visual authority. `unity-graphics` (URP lighting/materials/post) and `unity-animation` (every acting asset moves; effects fire on the correct frame) feed it.
+10. **`unity-ui-designer`** (HUD/menus/safe-area; owns menu & text consistency; tokens derived from art-spec) → **`unity-qa-release`** (tests, iOS build, App Store readiness).
+
+**Scorecard precedence (one hierarchy):** `unity-aaa-graphics` scorecard = final whole-screen gate; `unity-art-direction` 0–2 gates = per-asset feeder; director Step 2.6 rubric = pre-spec only, superseded once art-spec exists.
+
+### Track & genre scaling (one DAG, scaled scope)
+
+Branch the DAG on the Step 2 pipeline decision (= art-spec `craft.finish`):
+
+- **2D-pixel:** canon = PixelLab anchor sheets; PPU/tile size/outline from the art-spec craft block; Point-filter/no-compression/pixel-perfect import (`unity-pixel-art`; genre layer: `unity-2d-sprite-games` for sprite-on-3D/HD-2D looks).
+- **2D-HD (non-pixel):** canon = Gemini turnaround/canon sheets; finals via `unity-image-generator`; motion via Tripo rig/pre-render (`unity-3d-generator` + `unity-animation`), never frame-by-frame Gemini.
+- **3D:** canon = style-locked turnaround feeding Tripo image→3D; scale enforced from the art-spec scale block; imported materials re-shaded to spec via `unity-graphics`.
+
+Scale VOLUME by genre — compression shrinks families and canon passes, never gates 2 and 7:
+
+- **Casual/hyper-casual puzzle:** compressed — art-spec + master palette + 1–2 asset families (pieces, board/background, key UI); steps 3–4 collapse into one canon pass (mascot + piece set); `composition.yaml` optional for a single static screen.
+- **Mid-core / pixel RPG:** full DAG — canon per recurring character, golden-first 80/20 families, `composition.yaml` required.
+- **AAA / showcase 3D:** full DAG + `unity-aaa-graphics` per-surface sourcing decision + BeautyCell visual regression per family.
+
+### Supporting phases (route any time; no art gate applies)
+
+- `unity-gameplay-systems`: playable slice, C# architecture, Input System, entity/state systems, game feel — 2D and 3D casual templates.
 - `unity-debug-profiler`: blank scene / null refs / compile errors, domain-reload recovery, profiler, draw calls, memory, mobile thermal/perf.
-- `unity-qa-release`: Play Mode + EditMode tests, device-resolution checks, iOS build pipeline, App Store / privacy-manifest readiness, release risks.
-- `unity-game-economy`: design the economy & meta-progression (currencies, sources/sinks, progression pacing, reward schedules, IAP catalog) that make the game retain and monetize — distinct from monetization (SDK wiring) and analytics (measurement).
-- `unity-localization`: globally-localizable text/assets via the Unity Localization package (String/Asset Tables, Smart Strings, per-script fonts/RTL, pseudoloc, localized store metadata). Externalize strings early.
-- `unity-aso-growth`: App Store Optimization + growth (listing, icon/screenshots/preview, Product Page A/B, soft-launch UA, SKAdNetwork measurement, ratings prompts). Retention before acquisition.
-- `unity-project-setup`: project foundation — source control (.gitignore/LFS/meta files), folder + asmdef architecture, package management, versioning, secrets-per-env, CI/CD basics.
+- `unity-qa-release`: Play Mode + EditMode tests, device-resolution checks, iOS build pipeline, App Store / privacy-manifest readiness.
+- `unity-game-economy`: economy & meta-progression design (currencies, sources/sinks, pacing, IAP catalog) — at design time, alongside Step 2.x.
+- `unity-analytics-liveops`: analytics/retention instrumentation, remote config + A/B, crash SDKs, ATT/SKAdNetwork.
+- `unity-localization`: String/Asset Tables, Smart Strings, per-script fonts/RTL — externalize strings early.
+- `unity-aso-growth`: store listing/icon/screenshots/preview, Product Page A/B, soft-launch UA. Retention before acquisition.
 
 If a sibling file cannot be loaded, record the path/reason and use this director's routing as the fallback for that phase.
 
@@ -195,6 +220,8 @@ If a sibling file cannot be loaded, record the path/reason and use this director
 - Play Mode runs: `manage_editor(action="play")` → `read_console` clean → `manage_scene(action="screenshot")` shows a real scene that PASSES the `unity-aaa-graphics` visual scorecard (textured primary surfaces, asset cohesion, real lighting/depth) — not merely "non-primitive" → `stop`. Confirm key acting assets are animated (idle/move/attack as the role requires), not static/T-pose, with gameplay effects firing on the correct animation frame.
 - Core loop reachable: input → objective → win/lose or restart path exercised (ideally a PlayMode test via `run_tests` + `get_test_job`).
 - Tests green before "done": EditMode/PlayMode via the `testing` group.
+- Art pipeline validates (for any production-art claim): `art-spec.yaml` exists and every asset contract passes `validate_asset_manifest.py` with exit 0 (`unity-asset-pipeline`).
+- Registry resolution: run `unity-asset-pipeline/scripts/check_scene_registry.py <scene.unity> --registry Assets/<Game>/Art/Approved/registry.yaml` on every saved gameplay scene (exit 0 required; an empty registry is a legal gray-box state — warned, not failed; `PLACEHOLDER`-named objects using engine-builtin primitives are reported, not failed, but any FILE-based art reference must resolve to the registry regardless of naming — never wire raw generated files even as placeholders). For live/unsaved scenes, additionally walk the renderers via MCP (`manage_scene`/`manage_gameobject`) and cross-check every visible sprite/mesh/material against the registry — each resolves to a registry entry OR is a ledger-flagged placeholder. Anything else = assembly-time bypass; fix before "done."
 - iOS readiness for release claims: IL2CPP backend, ASTC textures, deployment target >= iOS 13, bundle id/product/version set, Xcode project builds. Signing/`.ipa` is a manual macOS+Xcode step — flag it, do not claim it done.
 - Screenshots dominated by primitives, flat planes, or empty scenes = not done.
 
@@ -208,6 +235,7 @@ Track only what proves the outcome:
 - Pipeline: 2D / 3D / mixed
 - Novel-mechanic scope (if any): spec+worked-example agreed / make-or-break property + measured value / decomposed+unit-tested / forks surfaced
 - Aesthetic north-star: reference style / palette / type / mood + anti-target / latest rubric score
+- Art pipeline: art-spec path + approval status / master palette / golden anchors / canon sheets / registry state / flagged placeholder primitives / latest aaa-graphics scorecard
 - Sibling skills loaded: gameplay / graphics / ui / debug / qa (+ 3d/image/audio if used)
 - Credential probe: TRIPO / GEMINI / PIXEL_LABS / ELEVENLABS = SET|MISSING
 - Asset sourcing: hero source + evidence (task id / file) or skip reason

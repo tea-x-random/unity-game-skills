@@ -13,7 +13,7 @@ Static art reads as a prototype. AAA games are defined by **motion** — an arch
 
 ## When to use which track
 
-- **Pixel-art sprite animation (PixelLab via `unity-pixel-art`) — the DEFAULT for pixel-art games.** Lock one anchor sprite, derive frames/directions/variants from it, then slice/build Animation Clips here. This preserves native pixel clusters, palette, baseline, and silhouette.
+- **Pixel-art sprite animation (PixelLab via `unity-pixel-art`) — the DEFAULT for pixel-art games.** Lock one anchor/base sprite, then drive motion with PixelLab's **skeleton animation** (`estimate-skeleton` → author per-frame poses → `animate-skeleton`), `rotate` for directions, and `inpaint` for fixes — then slice/build Animation Clips here. **Every PixelLab call carries the palette lock** (`color_image`: master palette for anchors, the anchor's extracted sub-palette for derived frames) — a call without it is invalid. Skeleton-driven frames stay structurally consistent (identity, clusters, palette, baseline, silhouette); PixelLab `animate-text` and image-model frame strips drift and are fallback only.
 - **3D skeletal animation (Tripo) — the DEFAULT for runtime 3D and non-pixel/high-res 2D pre-render.** Tripo auto-rigs the model and generates animation cycles; for 3D/2.5D assets import the rig and drive it with an Animator, and for non-pixel 2D/top-down/side games pre-render the rigged + animated model to sprite frames (`../unity-3d-generator/references/prerender-2d.md`).
 - **Frame-by-frame 2D sprite authoring (Gemini frame strips) — FALLBACK only.** Use it when Tripo is unavailable (`TRIPO_API_KEY` MISSING/quota-blocked) or the motion is trivial (a simple bob/tween). Independently generating each frame with an image model **drifts** — identity changes between frames — so it is never the first choice for real motion.
 - **Procedural / tween motion** — squash-stretch, bob, anticipation, screen-shake, hit-stop — layered on TOP of (or instead of, for simple props) authored animation. Owned by `unity-gameplay-systems` game-feel; use it for pickups, button presses, and juice.
@@ -46,14 +46,15 @@ Generating per-state frame strips directly with Gemini is a **FALLBACK** — rea
 
 **Sheet procedure:**
 
-1. **Lock an anchor frame first**, then derive the strip. For pixel art, the anchor is a PixelLab native-canvas sprite from `unity-pixel-art`; for non-pixel fallback strips, use an approved reference frame. Run `validate_sprite.py` + `critique_image.py` where applicable before expansion.
-2. **Generate per-state frame strips** with `unity-pixel-art` for pixel-art projects, or with `unity-image-generator` only for non-pixel fallback/concept strips: request an evenly-spaced horizontal strip of N frames on transparent background, consistent pivot/scale/baseline across frames, one clip per state. Reuse verbatim style tokens and anchor/reference images so frames stay on-model.
+1. **Lock an anchor frame first**, then derive the strip. For pixel art, the anchor is a PixelLab native-canvas sprite from `unity-pixel-art`; for non-pixel fallback strips, use an approved reference frame. Run `validate_sprite.py` + `critique_image.py` (both with `--art-spec <spec>` — they FAIL without a resolvable spec; `--no-art-spec` is exploratory-only) where applicable before expansion.
+2. **Generate per-state frame strips** with `unity-pixel-art` for pixel-art projects (master palette / anchor sub-palette as `color_image` on every call), or with `unity-image-generator` only for non-pixel fallback/concept strips: request an evenly-spaced horizontal strip of N frames on transparent background, consistent pivot/scale/baseline across frames, one clip per state. Reuse verbatim style tokens and anchor/reference images so frames stay on-model.
    - Frame-count guidance: idle/bob 2–6, walk 6–8, attack/fire 5–10. More frames = smoother but heavier; ease the in-betweens, don't just linearly tween.
-3. **Extrude/pad the sheet** before import to prevent texture bleed: `unity-image-generator/scripts/extrude_atlas.py --rows 1 --cols <N> --extrude 2 --padding 2 ...`; slice using the manifest's frame rects.
-4. **Slice** in Unity (Sprite Editor → Grid by Cell Count / Sequence or manifest rects) with a consistent pivot/baseline. Reject sheets where the character visibly changes size or feet/ground contact drift.
-5. **Build Animation Clips** (one per state), set frame rate (10–14 fps reads well for casual), loop idle/walk, one-shot attack/death.
-6. **Animator Controller** with states + transitions driven by parameters/triggers (`Speed` float, `Fire` trigger, `IsDead` bool).
-7. **Pack frames into a Sprite Atlas** to keep draw calls down.
+3. **Gate pixel strips with the frame-vs-anchor diff (MANDATORY before slicing):** `unity-pixel-art/scripts/compare_frames_to_anchor.py --anchor <approved_anchor.png> --strip <clip_strip.png> --cols <N>` — deterministic palette-membership + baseline/bbox-height + loose silhouette-IoU checks. Exit 1 = repair the failing frame (`inpaint` / `--init-images` freeze via `unity-pixel-art`), never re-roll the whole strip. Eyeballing does not replace this gate.
+4. **Extrude/pad the sheet** before import to prevent texture bleed: `unity-image-generator/scripts/extrude_atlas.py --rows 1 --cols <N> --extrude 2 --padding 2 ...`; slice using the manifest's frame rects.
+5. **Slice** in Unity (Sprite Editor → Grid by Cell Count / Sequence or manifest rects) with a consistent pivot/baseline. Reject sheets where the character visibly changes size or feet/ground contact drift.
+6. **Build Animation Clips** (one per state), set frame rate (10–14 fps reads well for casual), loop idle/walk, one-shot attack/death.
+7. **Animator Controller** with states + transitions driven by parameters/triggers (`Speed` float, `Fire` trigger, `IsDead` bool).
+8. **Pack frames into a Sprite Atlas** to keep draw calls down.
 
 See `references/animation-recipes.md` for the clip-build + Animation Event code.
 
@@ -98,6 +99,7 @@ Score each; fix any that fail before "done":
 - **`unity-pixel-art`** — produces pixel-native anchors, sheets, rotations, and frame strips for pixel-art animation.
 - **`unity-image-generator`** — produces non-pixel 2D frame strips only when appropriate, plus concepts/references and validators.
 - **`unity-art-direction`** — the AssetBrief's `animation` field declares required clips per asset; budgets bound bone/frame counts.
+- **`unity-asset-pipeline`** — finished sprite sheets, Animation Clips, and Animator Controllers ship through the asset contract + approved registry exactly like static art (contract lists sheet/clip/controller paths; the BeautyCell scores a designated key pose). Scene builders take animated prefabs from the registry, never from raw generated strips.
 - **`unity-aaa-graphics`** — its visual scorecard includes an animation axis; a static asset where motion is expected fails the gate.
 - **`unity-gameplay-systems`** — procedural game-feel/juice that layers on top.
 

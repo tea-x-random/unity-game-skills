@@ -7,7 +7,7 @@ description: "Turn generated source art (Gemini images, PixelLab pixel sprites, 
 
 Generators produce **source art**. This skill produces **approved runtime asset packages**. The boundary between the two is the single most important thing to enforce: an image or mesh existing on disk is NOT an asset that belongs in the game. An asset belongs in the game only when it has a contract, passes validation, ships as a prefab, and is entered into the registry.
 
-> **The hard rule.** Scene-building agents may only instantiate prefabs listed in the **approved-asset registry**. They must NEVER drag a freshly generated file directly into a gameplay scene. Generators feed `Assets/Art/Source/`; only this pipeline writes to `Assets/Art/Approved/` and the registry.
+> **The hard rule.** Scene-building agents may only instantiate prefabs listed in the **approved-asset registry**. They must NEVER drag a freshly generated file directly into a gameplay scene. Generators feed `Assets/<Game>/Art/Source/`; only this pipeline writes to `Assets/<Game>/Art/Approved/` and the registry.
 
 This skill is downstream of `unity-art-direction` (which owns the locked `art-spec.yaml`, style presets, mobile budgets, and the family strategy) and upstream of `unity-scene-composition` (which owns placement). It turns the art-direction *process* into *enforceable data*.
 
@@ -29,21 +29,27 @@ Never skip forward. A "good-looking" source image with no contract, no import va
 
 ## The asset contract (machine-readable, per asset)
 
-Every approved asset ships with `Assets/Art/Approved/<id>/asset-contract.yaml`. This is what stops each agent from improvising scale, pivot, material, silhouette size, and camera assumptions. Full annotated template: `references/asset-contract-template.yaml`. Minimum shape:
+Every approved asset ships with `Assets/<Game>/Art/Approved/<id>/asset-contract.yaml`. This is what stops each agent from improvising scale, pivot, material, silhouette size, and camera assumptions. Full annotated template: `references/asset-contract-template.yaml`. Minimum shape:
 
 ```yaml
+schema: unity-game-skills.asset-contract.v1   # REQUIRED — validator fails loudly without it
 id: meadow_tree_a
 family: meadow_vegetation
 role: midground_obstacle
 style_id: cozy_toy_diorama_v1        # MUST match art-spec.yaml style_id
+art_spec: Assets/<Game>/Art/_ArtDirection/art-spec.yaml   # validator resolves the spec from here
 source:
-  generator: pixellab                # pixellab | tripo | gemini | authored
+  generator: gemini                  # pixellab | tripo | gemini | authored | kitbash | vendor | elevenlabs
+  source_art: Assets/<Game>/Art/Source/meadow_tree_a.png  # required to compute palette/scale checks
   prompt_hash: "sha256:..."
-  reference_pack: meadow_family_v1
+  reference_pack:                    # resolvable file paths (anchors, palette swatch, sheets)
+    - Assets/<Game>/Art/_ArtDirection/palettes/master-palette.png
 runtime:
-  prefab: Prefabs/Environment/MeadowTreeA
+  type: sprite                       # REQUIRED — sprite | model | ui | texture | vfx | audio; sprite checks key off this
+  prefab: Assets/<Game>/Art/Prefabs/Environment/MeadowTreeA.prefab
   pivot: bottom_center
-  pixels_per_unit: 100               # 2D
+  pixels_per_unit: 100               # MUST equal art-spec craft.pixels_per_unit (project PPU SSOT)
+  scale_meters: [1.2, 1.8, 1.2]      # world-space bounds target; drives computed scale_valid
   collider: capsule
   material_profile: World_Stylized_v1
   shadow_profile: soft_blob_v1
@@ -63,18 +69,47 @@ qa:
 
 ## Validate the contract + source: `validate_asset_manifest.py`
 
-Run before importing. It checks the contract is well-formed, that `style_id` matches the project `art-spec.yaml`, that the `camera_contract` agrees with the scene composition profile, and (for 2D) ingests both the pixel QA report from `unity-image-generator/scripts/validate_sprite.py` and the vision critique report from `unity-image-generator/scripts/critique_image.py` so alpha/halo/palette/finish failures AND wrong-subject/role-fit failures block approval:
+Run before importing. Coherence checks are **default-on and FAIL when their inputs are absent** — no silent skips:
+
+- Resolves the art-spec from `--art-spec` or the contract's `art_spec:` path (registry mode: the registry's `art_spec:` key); unresolvable spec = FAIL. `--no-art-spec` is the ONLY escape hatch and is for exploratory/concept contracts, never approval.
+- Resolves `composition.yaml` from `--composition` or as a sibling of the art-spec (registry mode: `composition_profile:`); checks `camera_contract` against it (`--no-composition` only when no profile exists yet).
+- Checks `style_id` equality and, for sprites, `runtime.pixels_per_unit` == art-spec `craft.pixels_per_unit` (plus PPU **uniformity across the whole registry** in `--registry` mode — one game = one PPU).
+- **Computes** `palette_valid` by running `unity-image-generator/scripts/validate_sprite.py` as a subprocess against the art-spec palette (exact per-pixel membership for `craft.finish: pixel`; average-distance heuristic otherwise). If the tool can't run, that is a FAIL, not a skip.
+- **Computes** `scale_valid` for sprites from source PNG dims: world height (`height_px / PPU`) vs `runtime.scale_meters[1]`, plus canvas-is-a-tile-multiple for pixel finish. 3D `scale_valid` stays with the Editor import validator.
+- Ingests the pixel QA report (`--sprite-qa`), vision critique report (`--image-critique`), and frame-vs-anchor diff report(s) (`--frame-diff`, or the contract's `qa.frame_diff_report`) so alpha/halo/finish, wrong-subject/role-fit, AND animation-identity failures block approval. A contract with a frame-based 2D `animation:` block (`runtime.type: sprite` or `animation.sheet` set) and no frame-diff report FAILS (sets `qa.frame_diff_valid`); 3D skeletal clips (`sheet: null`) pass this check as N/A — they are validated by unity-3d-generator's validate-animation instead.
+- Checks `composition.yaml:shadow_and_contact.key_light_direction` == art-spec `craft.light_direction` (one global light direction; string inequality = failure).
+- Checks the **GameTheme.cs derived view**: every color hex in the file at `derived_artifacts.game_theme_cs` (or `--game-theme`) must exist in the art-spec palette subtree (roles + arrays + ramps) — colors only, typography/spacing/radii are GameTheme-native.
 
 ```bash
 python3 ~/.claude/skills/unity-asset-pipeline/scripts/validate_asset_manifest.py \
-  Assets/Art/Approved/meadow_tree_a/asset-contract.yaml \
-  --art-spec Assets/GameArt/_ArtDirection/art-spec.yaml \
-  --sprite-qa Assets/Art/QA/meadow_tree_a.sprite-qa.json \
-  --image-critique Assets/Art/QA/meadow_tree_a.critique.json \
-  --composition Assets/GameArt/_ArtDirection/composition.yaml
+  Assets/<Game>/Art/Approved/meadow_tree_a/asset-contract.yaml \
+  --sprite-qa Assets/<Game>/Art/Source/QA/meadow_tree_a.sprite-qa.json \
+  --image-critique Assets/<Game>/Art/Source/QA/meadow_tree_a.critique.json
 ```
 
 Exit code 0 = contract valid and all referenced QA passed; non-zero = rejected (do not import).
+
+## Scene-walk registry resolution: `check_scene_registry.py`
+
+The assembly-time bypass detector — the scripted half of `unity-game-director`'s Verification rule ("every placed asset resolves to a registry entry"). It parses `.unity` scene files directly (no Unity/PyYAML needed), collects every ART reference (prefab instances, sprites, meshes, materials by guid), and fails any that don't resolve to the approved registry (a registry prefab, or a file inside a registered asset's approved folder). An EMPTY registry (no entries yet) is the legal gray-box state — reported as `registry_empty`, not failed. Engine-builtin primitives never fail, and GameObject names containing `PLACEHOLDER` (configurable) are reported for visibility — but any FILE-based art reference must resolve to the registry regardless of object naming; never wire raw generated files into a scene, even as placeholders. The prototype-first doctrine stays intact: gray-box = flagged primitives.
+
+```bash
+python3 ~/.claude/skills/unity-asset-pipeline/scripts/check_scene_registry.py \
+  Assets/Scenes/Gameplay.unity \
+  --registry Assets/<Game>/Art/Approved/registry.yaml \
+  --json-report Assets/<Game>/Art/QA/scene-registry.json
+```
+
+Exit 0 = every file-based scene art reference is registry-approved (engine builtins exempt); exit 2 = assembly-time bypass — fix before "done". (An MCP scene-walk cross-check remains valid for live/unsaved scenes; this script covers saved scenes deterministically.)
+
+## Bounded re-roll policy (when a candidate fails QA)
+
+Re-rolls are bounded, targeted, and route-scoped — never a blind loop:
+
+- Auto-re-roll ONLY when the critique overall score is below **~2.25/3** (the quality ceiling); candidates above it gain nothing from re-rolls — fix the brief or accept.
+- Each re-roll must target the **two worst-scoring axes** in the revised prompt; keep the **best-seen** candidate across iterations, never just the latest.
+- Hard cap: **2 re-roll iterations**, then stop and escalate (revise the AssetBrief or get a human call).
+- Scope: the **Gemini route only**. Pixel assets are never blanket re-rolled — repair the broken region with PixelLab `inpaint` ("fix, don't reroll", see `unity-pixel-art`).
 
 ## Apply the contract in Unity + build the prefab
 
@@ -99,7 +134,7 @@ A candidate fails automatically if it cannot pass all of these. The screenshot i
 
 ## The approved-asset registry
 
-The registry (`Assets/Art/Approved/registry.yaml`) is the **only** index scene-building agents read. Schema and the "no raw files in scenes" rule: `references/registry-schema.md`. Each entry references a contract + prefab + passing QA/screenshot. `validate_asset_manifest.py --registry` re-validates every entry. If an asset is not in the registry, it does not exist for level assembly.
+The registry (`Assets/<Game>/Art/Approved/registry.yaml`) is the **only** index scene-building agents read. Schema and the "no raw files in scenes" rule: `references/registry-schema.md`. Each entry references a contract + prefab + passing QA/screenshot. `validate_asset_manifest.py --registry` re-validates every entry. If an asset is not in the registry, it does not exist for level assembly.
 
 ## Beauty cell first — build one screen before a level
 
@@ -116,6 +151,10 @@ Use **PixelLab** (`unity-pixel-art`) for final **pixel-art** sprites, tilesets, 
 Use **Gemini** (`unity-image-generator`) primarily for: concept boards, background paintings, decals, UI illustrations/icons, texture/source references, non-pixel static art, and whole-pack family sheets with shared visual DNA. Avoid using it as the default source for independent gameplay-facing foreground props when a pixel or 3D route is more appropriate.
 
 Use **Tripo** (`unity-3d-generator`) or deliberately simple authored geometry for: runtime 3D characters/props, non-pixel props that cast shadows, interactables, scenery needing consistent perspective, and anything near the player camera. For a non-pixel 2D look, render those 3D assets through ONE shared Unity lighting/material pipeline into sprite atlases (**sprite bake** / pre-render — see `unity-3d-generator` pre-render pipeline and `references/sprite-bake.md`).
+
+**Animated assets go through the same gate.** Finished sprite sheets, clips, and Animator Controllers (`unity-animation`) ship via contract + registry like statics: record them in the contract's `animation:` block (clip list, controller path, designated `key_pose`), and BeautyCell scores the key pose (see `references/beauty-cell.md`).
+
+**Audio clips are assets too.** ElevenLabs clips (`unity-audio-generator`) enter production via a per-clip contract with `runtime.type: audio` + the `runtime.audio:` section (load type, Vorbis quality, force-to-mono, loop flag, target LUFS) and a registry entry. A `loop: true` contract requires the seamless-loop crossfade post-process to have run — it is not an ElevenLabs feature.
 
 ## What this skill does NOT do
 

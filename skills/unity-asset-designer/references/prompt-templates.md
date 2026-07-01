@@ -2,13 +2,14 @@
 
 These produce the reference artifacts and the conditioned production assets. They are **inputs for `unity-image-generator`** — run them through its `scripts/generate_image.py` (`--prompt/-p`, `--filename/-f`, `--input-image/-i` for reference conditioning, `--resolution/-r {1K,2K,4K}`). That skill owns API mechanics, billing/quota gotchas, and Unity import — see its SKILL.md. The point of these templates is the **wording that pins the look**; keep a single "STYLE TOKEN" string in your style guide and paste it **verbatim** into every prompt (re-describing the look in new words is the #1 cause of drift).
 
-Reusable building block — define once in `style-guide.md`, paste everywhere:
+Reusable building block — EVERY bracket is filled from `art-spec.yaml` (or the user's measured reference), never from this skill's priors; there is no default shape language, mood, or NOT-list. `generate_image.py --art-spec` already injects a spec-derived style paragraph automatically — the hand-assembled token below is for prompts you compose yourself and MUST agree with the spec:
 
 ```
-STYLE TOKEN = "[your shading model, e.g. flat/cel/painterly], [your palette] palette, uniform [Npx] [your outline color] outline,
-single soft light from [top-left] with no rim light, round friendly shape language,
+STYLE TOKEN = "[craft.finish / shading model], [palette hexes from art-spec palette] palette, uniform [Npx] [outline color] outline,
+single soft light from [craft.light_direction] with no rim light, [shape_language.primary],
 clean edges, transparent background, [your mood words] mood —
-NOT busy, NOT glossy, NOT desaturated, NOT cluttered"
+[NEG list built ONLY from the measured axes where the target differs from the model's drift
+ (see unity-image-generator "counter-steer" rule) — NEVER a blanket NOT-list]"
 ```
 
 ---
@@ -33,6 +34,8 @@ Flat 2D, front-on, generous negative space, no photographic texture, no text lab
 ## 2. CHARACTER MODEL / TURNAROUND SHEET prompt (canon — generate FIRST)
 
 One sheet, multiple aligned views + expressions + color callouts. This becomes the single source of truth and the image-to-3D input.
+
+**Pixel track caveat:** do NOT use this Gemini prompt for pixel-game canon — pixel canon is the approved PixelLab anchor + rotations composited into a sheet (see `unity-pixel-art`, step 4).
 
 ```
 A character model / turnaround reference sheet for [CHARACTER — e.g. a friendly mascot],
@@ -87,7 +90,11 @@ After generation: judge the grid **at size**, side-by-side. One mismatched cell 
 Pass the canon sheet / style tile as the reference image (`-i`) and pin style verbatim. This is how every production asset is made — never from scratch.
 
 ```
-[run with: generate_image.py -i Assets/<YourGame>/Art/Refs/character_model_sheet.png -p "<below>" -f Assets/.../character_token.png -r 2K]
+[run with: generate_image.py --art-spec Assets/<Game>/Art/_ArtDirection/art-spec.yaml \
+  -i Assets/<Game>/Art/_ArtDirection/sheets/<char_id>_canon.png --input-role "character identity" \
+  -i <style_tile.png> --input-role "art style" \
+  -p "<below>" -f Assets/.../character_token.png -r 2K
+ — or simply --character <id>, which attaches the canon sheet + frozen identity_string from the spec]
 
 Using the attached reference sheet as the canonical character and art style, produce [ONE board
 token of the character, facing front, simplified to read at ~8px]. Keep the SAME character identity,
@@ -97,7 +104,7 @@ Single centered subject, transparent background, clean edges.
 ```
 
 Reference-conditioning rules (Gemini / "nano-banana" family):
-- **Role-tag multiple inputs** when you pass more than one: "use Image A for the character identity, Image B for the art style, Image C for the background." ([Google — Nano Banana Pro prompting](https://blog.google/products-and-platforms/products/gemini/prompting-tips-nano-banana-pro/))
+- **Role-tag multiple inputs** — supported natively: repeat `--input-image` with a paired `--input-role` per image; the script sends the roles as interleaved text parts ("Image 1 = character identity."). ([Google — Nano Banana Pro prompting](https://blog.google/products-and-platforms/products/gemini/prompting-tips-nano-banana-pro/))
 - **Reuse exact tokens** every time ("emerald eyes," not "green eyes"; "flat cel," not "cartoon shading").
 - **Identity reminder** for multi-turn edits: "use the same character identity / same art style as the previous image."
 - **Reuse the seed** when exposed for near-identical re-rolls.
@@ -108,7 +115,7 @@ Reference-conditioning rules (Gemini / "nano-banana" family):
 ## 5. APP-ICON prompt (derive from the mascot sheet, square, opaque)
 
 ```
-[run with: -i <mascot_sheet.png>]
+[run with: --art-spec <art-spec.yaml> -i <mascot_sheet.png> --input-role "character identity" (or --character <id>)]
 Using the attached mascot sheet as canon, produce an iOS app icon: the [character] centered, bold and
 legible at thumbnail size, filling a rounded-square 1024x1024, SOLID background (NO transparency),
 same palette/outline/shading/lighting as the sheet. Strong silhouette, no small text. [STYLE TOKEN].

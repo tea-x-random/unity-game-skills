@@ -28,6 +28,11 @@ Lay every item side-by-side at display size:
 
 **One outlier → regenerate the whole sheet, not the outlier.** A single replacement icon generated separately will not match the set's lighting/scale — that's the icon-by-icon drift this skill exists to prevent.
 
+## Automated checks (run these first — self-grading misses drift)
+
+- **On-model (identity + style):** `unity-image-generator/scripts/critique_image.py <asset> --reference <canon_sheet> --art-spec <spec>` — the vision judge sees the canon and scores `on_model_vs_reference` (0–3).
+- **Palette (deterministic):** `validate_sprite.py <asset> --art-spec <spec>` (average distance) or `--palette-mode exact` + `--max-distinct-colors N` for hard palette locks.
+
 ## Reject loop
 
 1. Identify the failing axis (above).
@@ -37,7 +42,7 @@ Lay every item side-by-side at display size:
 
 ## Cross-skill checks before "done"
 
-- [ ] **Palette == UI tokens.** The style-guide hexes equal `unity-ui-designer`'s color tokens (e.g. `GameTheme.cs` — one source of truth). If they differ, fix the mismatch before icons enter the HUD/menu.
+- [ ] **Palette == UI tokens == art-spec.** `art-spec.yaml:palette.roles` is the SSOT; the style guide, `GameTheme.cs` color hexes, and `unity-ui-designer`'s tokens are runtime views DERIVED from it. On mismatch, regenerate the derived views from the spec — never hand-edit either side into agreement.
 - [ ] **Recurring character is one character.** All its forms (e.g. token / mascot / app-icon) trace to the SAME model sheet and pass on-model. Side-by-side them: would a stranger call them the same character?
 - [ ] **Handoff is concrete.** The exact prompt + reference image went to `unity-image-generator` (2D) or the turnaround to `unity-3d-generator` (image-to-3D); generation + Unity import (Sprite/PPU/ASTC/atlas, or ModelImporter) is THEIR job, not asserted here.
 

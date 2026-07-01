@@ -74,6 +74,8 @@ Phones range ~19.5:9 (modern) to 4:3 (iPad). Never use absolute pixel positions.
 
 A casual game's look drifts when every screen sets its own font sizes, colors, paddings, and radii as magic numbers. The fix from established design-system practice ([USWDS design tokens](https://designsystem.digital.gov/design-tokens/), [Adobe Spectrum](https://spectrum.adobe.com/page/design-tokens/), [Material 3]): define a **token layer** — a curated palette of named values that *everything* references — instead of hard-coding values per widget. Tokens are "the smallest unit of a design decision… a single source of truth" ([UXPin](https://www.uxpin.com/studio/blog/what-are-design-tokens/)); the win is that restyling becomes a **one-place change** that updates every screen at once.
 
+**Explicit input — when the project has an `art-spec.yaml`, the token PALETTE is derived from it, never invented here.** Read the spec's `palette.roles` (`ground`, `panel`, `ink`, `accent_primary`, `accent_secondary`) + palette arrays (canonical path + legacy roots: `docs/PIPELINE_CONVENTIONS.md`) and map them onto the theme's semantic color roles. `GameTheme.cs` color hexes MUST equal the art-spec hexes exactly — **colors only**; typography, spacing, and radii are GameTheme-native (no art-spec source) and stay owned here. No art-spec (exploratory/prototype): pick a deliberate palette, flag it as unlocked, and reconcile when the spec lands.
+
 For a runtime-constructed Unity UI (no prefabs/UXML to centralize), the token layer is a **theme object** (a `GameTheme` ScriptableObject) referenced by the runtime builder (`AppRoot`). Put **all five token families** there, named, and reference them everywhere:
 
 1. **Typography scale** — a small set of named sizes (NOT per-call literals). e.g. `Display=78, Title=56, Heading=44, Subhead=32, Body=30, Label=26, Caption=22`. Add weight roles if the font has them. Every label picks a role, never a number.
@@ -97,7 +99,7 @@ public sealed class GameTheme : ScriptableObject {
 }
 ```
 
-**Real-world example:** the build leaked **16 distinct magic font-size literals** (24/26/28/30/31/32/38/40/42/44/56/60/64/72/76/78) across `AppRoot`, `LeaderboardView`, and `CubeApp` — three separate `Label(...)` factories each taking a raw `size`. That is exactly the "the menu looks cheap / text drifts" churn. A typography token set + one shared `Label` collapses those to ~7 named roles. **Self-heal note:** keep the theme usable from `CreateInstance` (default field values = the real values) so a null/headless asset ref still renders — and delete any `Resources/GameTheme.asset` that would shadow the `.cs` defaults with stale serialized values (the `.cs` is the single source of truth).
+**Real-world example:** the build leaked **16 distinct magic font-size literals** (24/26/28/30/31/32/38/40/42/44/56/60/64/72/76/78) across `AppRoot`, `LeaderboardView`, and `CubeApp` — three separate `Label(...)` factories each taking a raw `size`. That is exactly the "the menu looks cheap / text drifts" churn. A typography token set + one shared `Label` collapses those to ~7 named roles. **Self-heal note:** keep the theme usable from `CreateInstance` (default field values = the real values) so a null/headless asset ref still renders — and delete any `Resources/GameTheme.asset` that would shadow the `.cs` defaults with stale serialized values (the `.cs` is the **runtime source read by AppRoot** — itself a derived view of `art-spec.yaml`, the only style SSOT, whose palette hexes it must equal exactly, colors only).
 
 ## Shared component library — consistent by construction (atomic design)
 
@@ -173,7 +175,7 @@ A title/menu reads as "made by a studio" with these instead of a column of full-
 
 ## World-to-UI cohesion
 
-Match the game's art direction — palette, corner radius, icon family. Use a single consistent icon set; generate logos/icons/panels/title art with `unity-image-generator` rather than mismatched placeholders.
+Match the game's art direction — palette, corner radius, icon family. When `art-spec.yaml` exists, UI colors come from its `palette.roles` (see the Design-tokens input rule) and UI art prompts reuse the spec's verbatim style tokens. Use a single consistent icon set; generate logos/icons/panels/title art with `unity-image-generator` rather than mismatched placeholders.
 
 ## Verify (a screen is done only with evidence)
 
@@ -190,6 +192,7 @@ Before claiming UI work complete, load `references/checklists/ui-readability.md`
 A separate pass from readability/responsiveness: catches *drift* between screens (the menu-rework / text-drift churn). Run it once the screens exist; load `references/checklists/ui-consistency.md` for the full list. The core gates:
 
 - **Token discipline** — grep the UI code for raw font-size literals, color literals, and magic paddings/radii at call sites. There should be ~none: everything references the theme/token layer. (The example game had 16 orphan font sizes — that's a fail.)
+- **Hexes equal art-spec** — when `art-spec.yaml` exists, every theme color hex equals an art-spec palette hex (`palette.roles` + arrays) exactly; no invented UI colors (colors only — type/spacing/radii are theme-native).
 - **One factory per widget** — every Label/Button/Card/IconButton comes from the shared UI-kit; no screen news up and styles a `TextMeshProUGUI`/`Image`/`Button` inline; no forked per-screen copies of a factory.
 - **No string-literal drift** — every label shown on 2+ screens routes through one provider (e.g. `DifficultyRules.DisplayName`); no duplicated user-facing literals.
 - **Font default + no tofu** — the project TMP default font is set; a screenshot of any required non-Latin script (CJK) shows real glyphs, not boxes.
