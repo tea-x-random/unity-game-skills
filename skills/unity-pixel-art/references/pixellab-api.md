@@ -13,7 +13,7 @@ Use PixelLab for **final pixel-native sprites and animation**. Keep Gemini as a 
 | Method | Subcommand | Purpose |
 | --- | --- | --- |
 | `generate_image_pixflux` | `pixflux` | Text → pixel image. First anchor when the prompt fully defines subject/view/palette/canvas. |
-| `generate_image_bitforge` | `bitforge` | Style/image-conditioned image. Anchor-derived variants, recolors, edits; accepts a `style_image` + `skeleton_keypoints`. |
+| `generate_image_bitforge` | `bitforge` | Image-conditioned generation. Anchor-derived subjects/variants/recolors/edits via `init_image` (`style_image` is broken — see below); accepts `skeleton_keypoints`. |
 | `rotate` | `rotate` | Turn an existing sprite to a new `direction`/`view`. Build directional sheets from one anchor. |
 | `estimate_skeleton` | `estimate-skeleton` | Detect rest-pose keypoints from a base character → JSON template for animation. |
 | `animate_with_skeleton` | `animate-skeleton` | **Pose-driven animation. Structurally consistent across frames — the PREFERRED animation path.** |
@@ -33,16 +33,23 @@ Use PixelLab for **final pixel-native sprites and animation**. Keep Gemini as a 
 
 - `text_guidance_scale` 1.0–20.0 (pixflux default 8.0; **bitforge live default 8.0** — older docs said 3.0; inpaint default 3.0).
 - `extra_guidance_scale` — **DEPRECATED in the live API.** Do not tune it; treat any effect as a no-op.
-- **`style_strength` is 0–100** (SDK default `0.0`). This is the single biggest footgun: `0.85` is essentially **no** style transfer. Same-asset variants: **60–100**. Cross-subject derivation from a golden anchor (new character/prop): **50–70** — very high strength transfers the anchor's *identity* (anchor-subject bleed), not just style.
+- **`style_image`/`style_strength` are BROKEN on the live bitforge endpoint (verified 2026-07-01 with paid probes):** every strength (20/60/100), square and rectangular canvases, opaque and transparent refs, SDK and raw HTTP — all return **structured noise**, never a subject. Do not route conditioning through them; the schema advertises 0–100 but the output is unusable.
+- **The working conditioning channel is `init_image` + `init_image_strength` (1–999):** the golden is a structural/style init and the description re-subjects it. Live calibration: **cross-subject derivation ~75–150** (100–110 = clean new subject inheriting proportions/baseline/palette; 175+ visibly bleeds the anchor's identity — plume/helmet/outfit leaking); **same-asset variants/recolors 250–400**. bitforge also **500s when the reference image's dimensions ≠ `image_size`** — the helper script auto crop/pads (never resamples) the reference to the target canvas.
 - `skeleton_guidance_scale` (bitforge) default 1.0.
 - **`guidance_scale` (animate-with-skeleton) 1.0–20.0, live default 4.0** — the single knob for identity + pose adherence. The old `reference_guidance_scale` (1.1) / `pose_guidance_scale` (3.0) pair no longer exists in the live schema.
 - `image_guidance_scale` (animate-text **live default 1.4**; rotate default 3.0) 1.0–20.0.
 - `init_image_strength` 0–1000 (default 300).
 - `seed` — reproducibility/provenance metadata ONLY. It is never a cross-pose or cross-asset consistency mechanism; identity is carried by reference images, palettes, and skeletons.
 
-## SDK 1.0.5 lags the live API (caveat + raw fallback)
+## SDK 1.0.5 is INCOMPATIBLE with animate-with-skeleton (always raw)
 
-PyPI `pixellab` 1.0.5 (latest, and the installed version) still sends the **legacy** `reference_guidance_scale`/`pose_guidance_scale` names on animate-with-skeleton and cannot send the live `guidance_scale` — so tuning the old flags through the SDK is likely a **no-op** and the server default (4.0) governs. To actually tune it, POST raw (the helper script does this when you pass `--guidance-scale`):
+PyPI `pixellab` 1.0.5 (latest, and the installed version) cannot call the live `/animate-with-skeleton` at all (verified 2026-07-01): it serializes absent `inpainting_images`/`mask_images` as `null`, which the API 422s ("Input should be a valid list"), still sends the **legacy** `reference_guidance_scale`/`pose_guidance_scale` names, and cannot send the live `guidance_scale`. **The helper script therefore ALWAYS uses raw HTTP for `animate-skeleton`.** Additional live constraints the script auto-handles:
+
+- Canvas must be **square 16/32/64/128/256** ("Canvas must be size 256x256, 128x128, 64x64, 32x32 or 16x16") — non-square characters are padded (centered horizontally, bottom-aligned to preserve the baseline) and every returned frame is cropped back.
+- Each call takes an **exact pose count determined by the canvas** (e.g. **3 poses at 64×64** — "Expected 3 pose images"); longer clips are batched automatically, short tails padded with the last pose and trimmed.
+- `z_index` must be an **integer** — `/estimate-skeleton` itself returns fractional values (-3.5, -0.5); the script rounds them.
+
+Raw shape for reference:
 
 ```python
 import requests
@@ -67,11 +74,11 @@ There is **no `target_palette` parameter.** PixelLab forces a palette via `color
 
 - **Any PixelLab call without a `color_image` is invalid** on production paths. The helper script auto-attaches `art-spec conditioning.master_palette_png`; it FAILS loudly if the SDK would drop `color_image`.
 - **Derived frames/rotations use the anchor's extracted sub-palette** (subset of the master) — forcing the full game palette on a 5-color coin's frames permits cross-asset color borrowing. Produce the swatch from the approved anchor: `compare_frames_to_anchor.py --anchor <anchor.png> --emit-subpalette <id>_subpalette.png`, then pass it via `--color-image` (omitting `--color-image` falls back to the FULL master palette, which the derived-frame rule forbids).
-- `--palette '#aabbcc' ...` builds a swatch for exploration; if you pass hexes in the prompt text instead of a `color_image`, the palette is **not** enforced. `color_image` strictness is strong guidance, not verified as an absolute lock — keep `validate_sprite.py --palette` as the backstop.
+- `--palette '#aabbcc' ...` builds a swatch for exploration; if you pass hexes in the prompt text instead of a `color_image`, the palette is **not** enforced. Live verification 2026-07-01: a pixflux golden conditioned on a 22-color swatch came back **100% exact-membership** — `color_image` behaved as a hard lock in practice. Keep `validate_sprite.py --palette` as the backstop anyway (single sample). Exact-membership QA must check against the **swatch PNG's pixels** (what generation actually conditioned on), not the spec hex lists — the swatch legitimately carries the outline black that no ramp lists.
 
 ## Style-reference batching (web app only)
 
-PixelLab Pro's "Create images from style references" batch tool has **no API endpoint** — the API's only style conditioning is bitforge's single `style_image` per call. Treat batch style-referencing as a manual web-app step; scripted pipelines loop bitforge calls against the golden anchor instead.
+PixelLab Pro's "Create images from style references" batch tool has **no API endpoint**, and the API's `style_image` param is broken (noise — see above). Treat batch style-referencing as a manual web-app step; scripted pipelines loop bitforge **`init_image`** calls against the golden anchor instead.
 
 ## Image size
 
@@ -79,7 +86,7 @@ PixelLab Pro's "Create images from style references" batch tool has **no API end
 
 - **bitforge `skeleton_keypoints`** (pose-guided stills) works best at **16/32/64** canvases — that is where the spec attaches its quality warning.
 - **animate-with-skeleton supports up to 256** — a 48×48 skeleton animation is fully supported.
-- Style-referenced generation caps at **80×80 (plan tier 1) / 140×140 (tier 2+)** — see the large-canvas escape hatch in SKILL.md.
+- The web app's style-reference tool caps at **80×80 (plan tier 1) / 140×140 (tier 2+)**; the API init-conditioning path is verified at 32–64 canvases — see the large-canvas escape hatch in SKILL.md for 128+ set pieces.
 
 ## Consistent animated character — the skeleton workflow
 
@@ -98,7 +105,7 @@ Text-only animation drifts (identity changes frame to frame). For real, gameplay
      --image "Assets/<Game>/Art/Source/SourceImages/knight_base.png" \
      --output "Assets/<Game>/Art/_ArtDirection/sheets/biped_48.skeleton.json"
    ```
-3. **Author per-frame poses.** `skeleton_keypoints` is a list of frames; each frame is `{"keypoints": [{"x", "y", "label", "z_index"}, ...]}`. Labels are fixed: `NOSE, NECK, RIGHT/LEFT SHOULDER|ELBOW|ARM, RIGHT/LEFT HIP|KNEE|LEG, RIGHT/LEFT EYE|EAR`. Start from the game's skeleton template and move joints per frame (a walk = legs/arms swinging across ~6–8 frames). Coordinates are in pixels on the target canvas.
+3. **Author per-frame poses.** `skeleton_keypoints` is a list of frames; the LIVE API wants each frame as a **bare keypoint list** `[{"x", "y", "label", "z_index"}, ...]` (the script also accepts the friendlier `{"keypoints": [...]}` and normalizes). Labels are fixed: `NOSE, NECK, RIGHT/LEFT SHOULDER|ELBOW|ARM, RIGHT/LEFT HIP|KNEE|LEG, RIGHT/LEFT EYE|EAR`. `x`/`y` are **normalized 0–1** on the canvas (estimate-skeleton output is already normalized); `z_index` integer. Start from the game's skeleton template and move joints per frame (a walk = legs/arms swinging across ~4–8 frames).
 4. **Animate with the skeleton**, conditioning identity on the base character (canvas defaults to the reference; the live `guidance_scale` defaults to 4.0 server-side — pass `--guidance-scale` only to tune, which uses the raw HTTP path):
    ```bash
    python3 ../scripts/generate_pixel_art.py animate-skeleton \
@@ -134,6 +141,6 @@ PixelLab calls are paid. Before generating:
 1. Check credentials/probe output.
 2. `generate_pixel_art.py balance` before any batch.
 3. `--dry-run` to inspect the request payload and confirm enums/canvas/palette/anchor resolution (it runs the same art-spec gate).
-4. Generate ONE golden/anchor, QA it, then derive everything else from it (bitforge `style_strength` 60–100 same-asset / 50–70 cross-subject, rotate, animate-skeleton) instead of best-of-N rerolls.
+4. Generate ONE golden/anchor, QA it, then derive everything else from it (bitforge `init_image_strength` 250–400 same-asset / 75–150 cross-subject, rotate, animate-skeleton) instead of best-of-N rerolls — except tiles/seamless textures, where seams vary per roll and best-of-N on `tile.edge_wrap` is correct.
 5. Repair single bad frames (`inpaint`, `--init-images` freeze) instead of re-rolling strips.
 6. Batch only after the anchor passes QA.

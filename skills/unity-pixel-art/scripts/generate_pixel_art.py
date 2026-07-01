@@ -57,6 +57,8 @@ import glob
 import inspect
 import json
 import os
+import re
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -112,6 +114,37 @@ def _load_pil(path: str | None):
     from PIL import Image
 
     return Image.open(path).convert("RGBA")
+
+
+def _adapt_style_image(path: str | None, width: int, height: int):
+    """Load a bitforge style reference, adapted to the target canvas size.
+
+    The live bitforge endpoint 500s when `image_size` differs from the style
+    image's dimensions (verified empirically 2026-07-01), so a 32x64 character
+    golden cannot directly condition a 32x32 tile. Adapt WITHOUT resampling
+    (pixel art must never be scaled): per axis, center-crop when the style
+    image is larger than the target, center-pad onto transparency when smaller.
+    The adaptation is provenance-logged by the caller via style_image_adapted.
+    """
+    img = _load_pil(path)
+    if img is None or img.size == (width, height):
+        return img
+    from PIL import Image
+
+    src_w, src_h = img.size
+    # Crop axes where the source exceeds the target (centered).
+    left = max(0, (src_w - width) // 2)
+    top = max(0, (src_h - height) // 2)
+    img = img.crop((left, top, min(src_w, left + width), min(src_h, top + height)))
+    # Pad axes where the source is smaller (centered on transparency).
+    canvas = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+    canvas.paste(img, ((width - img.width) // 2, (height - img.height) // 2))
+    print(
+        f"style image {path} is {src_w}x{src_h}; adapted (crop/pad, no resample) "
+        f"to match the {width}x{height} canvas — bitforge rejects size mismatches.",
+        file=sys.stderr,
+    )
+    return canvas
 
 
 def _palette_to_color_image(hexes: list[str] | None):
@@ -315,7 +348,20 @@ def _apply_spec_defaults(args, spec: Any, spec_path: str) -> None:
     # bitforge call is conditioned on its golden anchor — a declared-but-missing
     # golden fails LOUDLY, exactly like a missing master palette; it never
     # silently degrades to an unconditioned text roll).
-    if hasattr(args, "style_image") and args.style_image is None:
+    #
+    # IMPORTANT (verified live 2026-07-01): the bitforge `style_image` pathway
+    # produces structured NOISE at every strength (20/60/100, square and
+    # rectangular canvases, opaque and transparent refs, SDK and raw HTTP).
+    # The working conditioning channel on the live API is `init_image` +
+    # `init_image_strength` (1-999): the golden acts as a structural/style init
+    # and the description re-subjects it. Calibration from live probes:
+    # cross-subject derivation ~75-150 (100 = clean new subject, same
+    # proportions/baseline/palette; 175+ bleeds the anchor's identity);
+    # same-asset variants/recolors 250-400.
+    # Autofill is bitforge-only: pixflux is the text-only golden roll (no anchor
+    # conditioning), and rotate/animate/inpaint take their reference/init images
+    # explicitly per the derived-frames workflow.
+    if getattr(args, "command", None) == "bitforge" and getattr(args, "init_image", None) is None and getattr(args, "style_image", None) is None:
         goldens = _spec_get(spec, "conditioning", "golden_assets", default={}) or {}
         family = getattr(args, "family", None)
         anchor = goldens.get(family) if family else None
@@ -328,16 +374,25 @@ def _apply_spec_defaults(args, spec: Any, spec_path: str) -> None:
             if not resolved.is_file():
                 raise SystemExit(
                     f"golden anchor missing on disk: {anchor} (resolved: {resolved}; spec: {spec_path}). "
-                    "Regenerate/approve it, or pass --style-image / --no-art-spec explicitly."
+                    "Regenerate/approve it, or pass --init-image / --no-art-spec explicitly."
                 )
-            args.style_image = str(resolved)
+            args.init_image = str(resolved)
+            args.golden_autofilled = True
         elif getattr(args, "command", None) == "bitforge":
             raise SystemExit(
                 "No conditioning source for production bitforge: the art-spec declares no "
                 "conditioning.golden_assets (family/game) and no conditioning.style_anchor_images. "
                 "Approve a golden anchor first (pixflux is the only text-only roll), or pass "
-                "--style-image / --no-art-spec explicitly."
+                "--init-image / --no-art-spec explicitly."
             )
+    if getattr(args, "style_image", None) is not None:
+        print(
+            "WARNING: bitforge style_image produced structured noise at ALL strengths on the "
+            "live API (verified 2026-07-01). Golden conditioning should use --init-image with "
+            "--init-image-strength (cross-subject ~75-150, same-asset 250-400). Proceeding "
+            "with style_image as explicitly requested.",
+            file=sys.stderr,
+        )
     # Canvas derived from tiles (never ad hoc): --canvas tile|character.
     if getattr(args, "canvas", None) and not (getattr(args, "width", None) and getattr(args, "height", None)):
         tile = _spec_get(spec, "craft", "tile_size")
@@ -396,8 +451,13 @@ def _raw_animate_with_skeleton(api_key: str, kwargs: dict[str, Any]) -> list[Any
         elif key in ("init_images", "mask_images"):
             payload[key] = [_b64_image_payload(v) for v in value if v is not None]
         elif key == "skeleton_keypoints":
+            # The live validator requires integer z_index, but /estimate-skeleton
+            # itself returns fractional ones (-3.5, -0.5) — round defensively.
             payload[key] = [
-                frame["keypoints"] if isinstance(frame, dict) and "keypoints" in frame else frame
+                [
+                    {**kp, "z_index": int(round(kp.get("z_index", 0)))}
+                    for kp in (frame["keypoints"] if isinstance(frame, dict) and "keypoints" in frame else frame)
+                ]
                 for frame in value
             ]
         else:
@@ -624,8 +684,9 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     bitforge.add_argument("--text-guidance-scale", type=float, default=8.0, help="1.0-20.0 (live API default 8.0)")
     bitforge.add_argument("--extra-guidance-scale", type=float, default=None, help="DEPRECATED in the live API — leave unset; tuning it is likely a no-op")
-    bitforge.add_argument("--init-image", help="Initial image to start from")
-    bitforge.add_argument("--init-image-strength", type=int, default=300, help="0-1000")
+    bitforge.add_argument("--init-image", help="Initial image to start from (THE working golden-conditioning channel; autofilled from conditioning.golden_assets)")
+    bitforge.add_argument("--init-image-strength", type=int, default=None,
+                          help="1-999. Cross-subject derivation ~75-150 (higher bleeds anchor identity); same-asset variants 250-400. Defaults: 110 when the golden was autofilled, else API default 300")
     bitforge.add_argument("--inpainting-image", help="Reference image which is inpainted")
     bitforge.add_argument("--mask-image", help="Inpaint mask (white = inpaint)")
     bitforge.add_argument("--no-background", action="store_true", help="Transparent background")
@@ -860,9 +921,11 @@ def main(argv: list[str] | None = None) -> int:
             "outline": args.outline,
             "shading": args.shading,
             "detail": args.detail,
-            "style_image": _load_pil(args.style_image),
-            "init_image": _load_pil(args.init_image),
-            "init_image_strength": args.init_image_strength,
+            "style_image": _adapt_style_image(args.style_image, args.width, args.height),
+            "init_image": _adapt_style_image(args.init_image, args.width, args.height),
+            "init_image_strength": args.init_image_strength
+            if args.init_image_strength is not None
+            else (110 if getattr(args, "golden_autofilled", False) else 300),
             "inpainting_image": _load_pil(args.inpainting_image),
             "mask_image": _load_pil(args.mask_image),
             "color_image": _resolve_color_image(args),
@@ -909,14 +972,27 @@ def main(argv: list[str] | None = None) -> int:
         frames = json.loads(Path(args.skeleton_json).read_text(encoding="utf-8"))
         if isinstance(frames, dict):  # accept estimate-skeleton output directly
             frames = frames.get("skeleton_keypoints_template") or frames.get("skeleton_keypoints") or [frames]
+        # Live-API frame format (verified 2026-07-01): each skeleton_keypoints entry
+        # is a BARE LIST of keypoint dicts. Normalize the friendlier authored formats
+        # ({"keypoints": [...]}, {"rest_keypoints": [...]}) so pose JSONs written by
+        # hand or copied from estimate-skeleton output both work.
+        frames = [
+            f.get("keypoints") or f.get("rest_keypoints") if isinstance(f, dict) else f
+            for f in frames
+        ]
+        bad = [i for i, f in enumerate(frames) if not isinstance(f, list) or not f]
+        if bad:
+            raise SystemExit(f"skeleton frames {bad} have no keypoints (expected a list, or a dict with 'keypoints').")
         ref = _load_pil(args.reference_image)
         if args.init_images:
             init_images = [_load_pil(p) for p in args.init_images]
         elif args.init_image:
             init_images = [_load_pil(args.init_image)] * len(frames)
         else:
-            init_images = None
-        mask_images = [_load_pil(p) for p in args.mask_images] if args.mask_images else None
+            # Live API rejects null here ("Input should be a valid list") — the
+            # SDK forwards None verbatim, so always send a list (empty = none).
+            init_images = []
+        mask_images = [_load_pil(p) for p in args.mask_images] if args.mask_images else []
         kwargs = {
             "image_size": image_size,
             "skeleton_keypoints": frames,
@@ -932,19 +1008,82 @@ def main(argv: list[str] | None = None) -> int:
             "color_image": _resolve_color_image(args),
             "seed": args.seed,
         }
+        # ALWAYS go raw for animate-with-skeleton: SDK 1.0.5 is incompatible with
+        # the live endpoint — it serializes absent inpainting_images/mask_images as
+        # null (the API 422s: "Input should be a valid list") and cannot send the
+        # live single `guidance_scale` param (verified 2026-07-01).
         if args.guidance_scale is not None:
-            # Live-API param the SDK (1.0.5) cannot send — go raw.
             kwargs["guidance_scale"] = args.guidance_scale
-            kwargs.pop("reference_guidance_scale", None)
-            kwargs.pop("pose_guidance_scale", None)
-            raw_frames = _raw_animate_with_skeleton(args.api_key, {k: v for k, v in kwargs.items() if v is not None})
-            save_info = _save_frames(raw_frames, args.output)
-            manifest = {**request, "sdk_method": "raw:POST /animate-with-skeleton",
-                        "sdk_skipped_kwargs": [], **save_info}
-            print(json.dumps({"ok": True, **save_info, "via": "raw HTTP (guidance_scale)"}, indent=2))
-            _write_manifest(getattr(args, "manifest", None), manifest)
-            return 0
-        method, method_name = _get_method(client, "animate_with_skeleton")
+        kwargs.pop("reference_guidance_scale", None)
+        kwargs.pop("pose_guidance_scale", None)
+        # The live endpoint requires a SQUARE canvas from {16,32,64,128,256}
+        # ("Canvas must be size 256x256, 128x128, 64x64, 32x32 or 16x16"), so a
+        # 32x64 character is animated on a 64x64 canvas: pad the reference/init
+        # images (centered horizontally, bottom-aligned to keep the baseline),
+        # remap the normalized keypoints, and crop every returned frame back.
+        w, h = args.width, args.height
+        crop_box = None
+        if w != h or w not in (16, 32, 64, 128, 256):
+            square = next((s for s in (16, 32, 64, 128, 256) if s >= max(w, h)), 256)
+            xoff, yoff = (square - w) // 2, square - h  # bottom-aligned
+            from PIL import Image as _Image
+
+            def _pad(img):
+                if img is None:
+                    return None
+                cv = _Image.new("RGBA", (square, square), (0, 0, 0, 0))
+                cv.paste(img, (xoff, yoff))
+                return cv
+
+            kwargs["reference_image"] = _pad(kwargs.get("reference_image"))
+            for lk in ("init_images", "mask_images"):
+                if kwargs.get(lk):
+                    kwargs[lk] = [_pad(i) for i in kwargs[lk]]
+            kwargs["skeleton_keypoints"] = [
+                [{**kp, "x": (kp["x"] * w + xoff) / square, "y": (kp["y"] * h + yoff) / square} for kp in fr]
+                for fr in kwargs["skeleton_keypoints"]
+            ]
+            kwargs["image_size"] = {"width": square, "height": square}
+            crop_box = (xoff, yoff, xoff + w, yoff + h)
+            print(
+                f"canvas {w}x{h} is not a legal skeleton-animation size; animating at "
+                f"{square}x{square} (baseline-preserving pad) and cropping frames back.",
+                file=sys.stderr,
+            )
+        clean_kwargs = {k: v for k, v in kwargs.items() if v is not None and v != []}
+        all_poses = clean_kwargs["skeleton_keypoints"]
+        try:
+            raw_frames = _raw_animate_with_skeleton(args.api_key, clean_kwargs)
+        except SystemExit as err:
+            # Frame count per call is canvas-dependent (e.g. 64x64 -> 3 poses +
+            # the reference slot): "Expected N pose images, got M". Re-batch.
+            m = re.search(r"Expected (\d+) pose images", str(err))
+            if not m:
+                raise
+            batch = int(m.group(1))
+            print(f"canvas requires exactly {batch} poses per call; batching {len(all_poses)} frames.", file=sys.stderr)
+            raw_frames = []
+            for i in range(0, len(all_poses), batch):
+                chunk = dict(clean_kwargs)
+                poses = all_poses[i : i + batch]
+                real = len(poses)
+                # The API wants EXACTLY `batch` poses — pad short tails by
+                # repeating the last pose, then drop the padded frames.
+                poses = poses + [poses[-1]] * (batch - real)
+                chunk["skeleton_keypoints"] = poses
+                for lk in ("init_images", "mask_images"):
+                    if lk in chunk:
+                        tail = chunk[lk][i : i + batch]
+                        chunk[lk] = tail + [tail[-1]] * (batch - len(tail))
+                raw_frames.extend(_raw_animate_with_skeleton(args.api_key, chunk)[:real])
+        if crop_box:
+            raw_frames = [f.crop(crop_box) for f in raw_frames]
+        save_info = _save_frames(raw_frames, args.output)
+        manifest = {**request, "sdk_method": "raw:POST /animate-with-skeleton",
+                    "sdk_skipped_kwargs": [], **save_info}
+        print(json.dumps({"ok": True, **save_info, "via": "raw HTTP"}, indent=2))
+        _write_manifest(getattr(args, "manifest", None), manifest)
+        return 0
     elif args.command == "animate-text":
         method, method_name = _get_method(client, "animate_with_text")
         kwargs = {

@@ -256,6 +256,32 @@ def palette_hexes(spec: dict) -> list[str]:
     return out
 
 
+def master_palette_colors(spec: dict, spec_path: str | Path | None = None) -> list[str] | None:
+    """Unique colors of conditioning.master_palette_png as hex strings, or None.
+
+    For exact-membership palette QA this is THE authoritative color set: it is the
+    literal artifact every PixelLab call conditioned on (color_image), so validating
+    against it keeps generation and validation keyed to the same lock. The spec hex
+    lists (palette_hexes) remain the fallback — but they can legally differ from the
+    swatch (e.g. the swatch carries the outline black that no ramp lists), and that
+    mismatch shows up as false off-palette failures.
+    Requires Pillow; returns None (caller falls back) when unavailable.
+    """
+    ref = get_path(spec, "conditioning.master_palette_png")
+    if not isinstance(ref, str) or not ref:
+        return None
+    p = resolve_project_path(ref, spec_path)
+    if not p.is_file():
+        return None
+    try:
+        from PIL import Image
+    except ImportError:
+        return None
+    img = Image.open(p).convert("RGBA")
+    colors = sorted({px[:3] for px in img.getdata() if px[3] >= 128})
+    return ["#%02X%02X%02X" % c for c in colors]
+
+
 def spec_finish(spec: dict) -> str | None:
     """craft.finish mapped to the flat/cel/rendered/any vocabulary (None if unset)."""
     finish = get_path(spec, "craft.finish")

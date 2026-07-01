@@ -26,10 +26,12 @@ Read only the branch you need:
 
 **Golden-anchor-first at the GAME level (hard rules):**
 
-- **Only the game golden** (`art-spec conditioning.golden_assets.game`) — or an explicitly approved golden reroll — may be generated text-only with `pixflux`. **Every subsequent character/prop/tile MUST be `bitforge` conditioned on the appropriate golden anchor via `--style-image`.**
-- Family model (aligns with unity-art-direction): the game golden seeds each **family golden** (`conditioning.golden_assets.<family>`); family members condition on their family golden. Pass `--family <name>` and the script auto-fills `--style-image` from the spec.
-- `--style-strength`: same-asset variants/recolors **60–100**; **cross-subject derivation** (a NEW subject from a golden, e.g. goblin from the knight anchor) **50–70** — very high strength transfers the anchor's *identity*, not just its style. QA every cross-subject result for **anchor-subject bleed** (the new subject inheriting the anchor's helmet/outfit/colors).
-- **Large-canvas escape hatch:** style-referenced generation caps at 80×80 (plan tier 1) / 140×140 (tier 2+). For approved 128+ boss/set-piece canvases beyond the cap, fall back to `pixflux` with the master palette + locked outline/shading enums + the frozen `identity_string`, then vision-QA the result against the game golden.
+- **Only the game golden** (`art-spec conditioning.golden_assets.game`) — or an explicitly approved golden reroll — may be generated text-only with `pixflux`. **Every subsequent character/prop SUBJECT MUST be `bitforge` conditioned on the appropriate golden anchor via `--init-image`.**
+- **Conditioning channel (verified live 2026-07-01):** bitforge's `style_image`/`--style-strength` produces **structured noise at every strength** on the live API — do not use it. The working channel is **`--init-image` + `--init-image-strength` (1–999)**: the golden is a structural/style init and the description re-subjects it. Calibration: **cross-subject derivation ~75–150** (110 is the script's autofill default; 175+ bleeds the anchor's identity — helmet/outfit/colors leaking into the new subject); **same-asset variants/recolors 250–400**. QA every cross-subject result for **anchor-subject bleed**.
+- Family model (aligns with unity-art-direction): the game golden seeds each **family golden** (`conditioning.golden_assets.<family>`); family members condition on their family golden. Pass `--family <name>` and the script auto-fills `--init-image` from the spec (bitforge only; the reference is auto crop/padded — never resampled — to the target canvas, which the API requires to match).
+- **Canvas class per subject:** `craft.char_tiles` is the STANDARD character footprint; short subjects (grunts, critters) use their own smaller footprint (e.g. 1×1 tile) — a short subject forced onto a tall canvas comes back as stacked duplicates.
+- **Field assets (tiles/textures) do not init on a subject golden** — a character init forces object-ness onto what should be a flat field. Tiles/textures: palette lock + prompt tokens carry coherence, `--outline lineless --shading "flat shading"`, description says *"edge-to-edge full bleed, no border, no outline, no frame, no objects"*. The FIRST approved tile becomes the terrain family golden; later tiles may init on IT (same asset class) at moderate strength. Best-of-N and keep the best `tile.edge_wrap` score — seams vary strongly between rolls.
+- **Large-canvas escape hatch:** for approved 128+ boss/set-piece canvases, `pixflux` with the master palette + locked outline/shading enums + the frozen `identity_string`, then vision-QA the result against the game golden.
 
 1. **Resolve the art contract.** Every production call runs under `art-spec.yaml` — the script resolves it (`--art-spec`, `$UNITY_ART_SPEC`, or probed `Assets/*/Art/_ArtDirection/art-spec.yaml` + legacy roots) and auto-fills the master palette, golden anchor, outline enum, tile-derived canvas (`--canvas tile|character`), and PPU provenance. **Production calls without a resolvable spec FAIL**; spec-less exploration requires an explicit `--no-art-spec`.
 2. **Explore cheaply with Gemini if needed.** Generate concept boards or silhouette sheets only. Do not approve Gemini pixels as final pixel-art assets.
@@ -56,7 +58,7 @@ Read only the branch you need:
 
 ## PixelLab helper script
 
-Use the bundled script for final generation. It resolves keys as `--api-key` → `PIXEL_LABS_API_KEY`, and the art-spec as `--art-spec` → `$UNITY_ART_SPEC` → probed project paths. With a resolved spec it auto-attaches the **master palette** (`conditioning.master_palette_png` → `color_image`), the **golden anchor** (`conditioning.golden_assets.<--family|game>` → `--style-image`), the outline enum, and the per-game default view/shading enums (`craft.view` / `craft.shading` → `--view`/`--shading`; explicit CLI flags win); production calls without a spec (or without a palette lock) fail. Exploration only: add `--no-art-spec`.
+Use the bundled script for final generation. It resolves keys as `--api-key` → `PIXEL_LABS_API_KEY`, and the art-spec as `--art-spec` → `$UNITY_ART_SPEC` → probed project paths. With a resolved spec it auto-attaches the **master palette** (`conditioning.master_palette_png` → `color_image`), the **golden anchor** (`conditioning.golden_assets.<--family|game>` → `--init-image`, bitforge only, default strength 110), the outline enum, and the per-game default view/shading enums (`craft.view` / `craft.shading` → `--view`/`--shading`; explicit CLI flags win); production calls without a spec (or without a palette lock) fail. Exploration only: add `--no-art-spec`.
 
 Game golden — the ONLY text-only roll (everything after conditions on a golden):
 
@@ -68,13 +70,14 @@ python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py pixflux \
   --manifest "Assets/<Game>/Art/Source/SourceImages/hero_knight_golden.pixellab.json"
 ```
 
-Every subsequent asset — `bitforge` on its golden. **`--style-strength` is a 0–100 scale** (SDK default 0 = no transfer). Same-asset variants 60–100; NEW subjects from a golden 50–70 (higher bleeds the anchor's identity into the new subject):
+Every subsequent subject — `bitforge` init-conditioned on its golden. **`--init-image-strength` is a 1–999 scale.** NEW subjects from a golden ~75–150 (autofill default 110; higher bleeds the anchor's identity into the new subject); same-asset variants/recolors 250–400. (`--style-image`/`--style-strength` are traps on the live API — noise at every strength.)
 
 ```bash
-# new family member: --family picks conditioning.golden_assets.<family> as --style-image
+# new family member: --family picks conditioning.golden_assets.<family> as --init-image
+# (short subject -> its own footprint, not the standard char canvas)
 python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py bitforge \
-  --description "pixel art goblin grunt, same game style, side view, transparent background" \
-  --canvas character --family enemies --style-strength 60 \
+  --description "pixel art goblin grunt, single small goblin, same game style, side view, transparent background" \
+  --width 32 --height 32 --family enemies \
   --no-background --view side --direction east \
   --output "Assets/<Game>/Art/Source/SourceImages/goblin_grunt.png" \
   --manifest "Assets/<Game>/Art/Source/SourceImages/goblin_grunt.pixellab.json"
@@ -83,10 +86,16 @@ python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py bitforge 
 python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py bitforge \
   --description "same coin, cracked damaged variant, same palette, same silhouette center" \
   --width 32 --height 32 \
-  --style-image "Assets/<Game>/Art/Approved/coin/coin.png" \
+  --init-image "Assets/<Game>/Art/Approved/coin/coin.png" --init-image-strength 320 \
   --color-image "Assets/<Game>/Art/Approved/coin/coin_subpalette.png" \
-  --style-strength 85 --no-background \
+  --no-background \
   --output "Assets/<Game>/Art/Source/SourceImages/coin_damaged.png"
+
+# field asset (tile/texture): NO subject init — palette + tokens + lineless/flat
+python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py pixflux \
+  --description "pixel art grass ground texture, flat field viewed from directly above, edge-to-edge full bleed, no border, no outline, no objects, seamless tileable" \
+  --canvas tile --view "high top-down" --outline lineless --shading "flat shading" \
+  --output "Assets/<Game>/Art/Source/SourceImages/grass_tile.png"
 ```
 
 ### Animation: skeleton-first (structural consistency)
@@ -100,8 +109,9 @@ python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py estimate-
   --image "Assets/<Game>/Art/Approved/hero_knight/hero_knight.png" \
   --output "Assets/<Game>/Art/_ArtDirection/sheets/biped_48.skeleton.json"
 
-# 2. author per-frame poses in knight_walk_frames.json (a list of frames,
-#    each {"keypoints":[{"x","y","label","z_index"},...]}), then:
+# 2. author per-frame poses in knight_walk_frames.json (a list of frames —
+#    each either a bare keypoint list [{"x","y","label","z_index"},...] or
+#    {"keypoints":[...]}; the script normalizes both), then:
 python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py animate-skeleton \
   --skeleton-json knight_walk_frames.json \
   --view side --direction east \
@@ -110,7 +120,7 @@ python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py animate-s
   --output "Assets/<Game>/Art/Source/SourceImages/knight_walk.png"   # -> _00.png… + _strip.png
 ```
 
-Canvas defaults to the reference image; identity/pose adherence is governed by the live API's single `guidance_scale` (server default 4.0) — tune it only via `--guidance-scale` (raw HTTP; the SDK's legacy `--reference/--pose-guidance-scale` flags are likely no-ops, see `references/pixellab-api.md`). Use `rotate` to spin the base/keyframes into other directions. **Fix single bad frames instead of re-rolling the strip:** `inpaint` (white mask) on that frame, or re-run `animate-skeleton` with `--init-images` freezing the approved frames. `animate-text` exists as a fallback when no skeleton can be authored, but it drifts more. Gate every strip with `compare_frames_to_anchor.py` before slicing.
+Canvas defaults to the reference image; identity/pose adherence is governed by the live API's single `guidance_scale` (server default 4.0), tunable via `--guidance-scale`. **Live-endpoint constraints (all auto-handled by the script, 2026-07-01):** the whole command runs over **raw HTTP** — SDK 1.0.5 is incompatible (it nulls absent `inpainting_images`/`mask_images`, which the API rejects, and can't send `guidance_scale`); the canvas must be **square 16/32/64/128/256** (non-square characters are padded baseline-preserving and frames cropped back); each call takes an **exact pose count set by the canvas** (e.g. 3 at 64×64 — longer clips are batched automatically); `z_index` must be an integer (estimate-skeleton emits fractional ones; the script rounds). Use `rotate` to spin the base/keyframes into other directions. **Fix single bad frames instead of re-rolling the strip:** `inpaint` (white mask) on that frame, or re-run `animate-skeleton` with `--init-images` freezing the approved frames. `animate-text` exists as a fallback when no skeleton can be authored, but it drifts more. Gate every strip with `compare_frames_to_anchor.py` before slicing.
 
 Before a paid batch, check credits and use `--dry-run` to verify dimensions, prompt, and conditioning inputs:
 
@@ -132,6 +142,8 @@ python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
   --require-alpha --min-padding 1 --max-width 128 --max-height 128 \
   --json-report "Assets/<Game>/Art/Source/QA/coin_anchor.sprite-qa.json"
 ```
+
+(Tile-aligned characters whose baseline sits on the bottom canvas edge use `--min-padding 0` — per-sprite edge padding is an atlas concern and is added by `extrude_atlas.py` at repack, not at generation. With an art-spec, exact palette membership is checked against the **master-palette.png swatch pixels** — the same artifact generation conditioned on — not the spec hex lists.)
 
 **MANDATORY for every animation strip / rotation set** — deterministic frame-vs-anchor identity diff (palette membership, baseline/bbox drift, loose silhouette-IoU identity-swap floor). Exit 1 = do not slice; repair the failing frame (`inpaint` / `--init-images` freeze) instead of re-rolling the strip:
 
@@ -155,7 +167,8 @@ python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
 Reject pixel assets for:
 
 - **any PixelLab call made without the palette lock** (`color_image` — master palette, or anchor sub-palette for derived frames);
-- a production asset generated without conditioning on its golden anchor (pixflux is game-golden-only);
+- a production SUBJECT generated without init-conditioning on its golden anchor (pixflux is legal only for the game golden, family-golden seeds for asset classes that can't derive from a subject anchor — e.g. the first terrain tile — and the large-canvas escape hatch);
+- any bitforge call using `--style-image`/`--style-strength` as the conditioning channel (live API returns noise — use `--init-image`);
 - generated at the wrong native canvas (canvas not derived from `craft.tile_size`/`char_tiles`);
 - anti-aliased/high-res painted edges that are not pixel-native;
 - palette drift outside the approved palette;

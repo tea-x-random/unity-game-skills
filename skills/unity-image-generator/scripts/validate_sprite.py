@@ -312,6 +312,10 @@ def validate(args: argparse.Namespace) -> dict:
     # Edge halo detection: matte-colored RGB values on the silhouette edge almost
     # always mean the PNG was flattened or chroma-keyed poorly before Unity import.
     if not args.tile:
+        # An exact member of the locked palette is never a halo: near-white/near-black
+        # ramp ends (e.g. a cream ramp top) legally sit on the silhouette edge and
+        # would otherwise false-fail small sprites where 1-3 pixels trip the ratio.
+        palette_members = set(parse_palette(args.palette)) if args.palette else set()
         edge_count = 0
         halo_count = 0
         halo_by_color = {name: 0 for name in MATTE_COLORS}
@@ -321,6 +325,8 @@ def validate(args: argparse.Namespace) -> dict:
                     continue
                 edge_count += 1
                 r, g, b, _ = rgba[x, y]
+                if (r, g, b) in palette_members:
+                    continue
                 for name, color in MATTE_COLORS.items():
                     if dist_rgb((r, g, b), color) <= args.halo_distance:
                         halo_count += 1
@@ -479,7 +485,11 @@ def main() -> int:
     args.art_spec_path = spec_path
     if spec is not None:
         if not args.palette:
-            hexes = artspec.palette_hexes(spec)
+            # Exact-membership QA must check against the SAME artifact generation
+            # conditioned on: the master-palette.png swatch (color_image). The spec
+            # hex lists are the fallback only — they can legally differ from the
+            # swatch (e.g. outline black), which reads as false off-palette fails.
+            hexes = artspec.master_palette_colors(spec, spec_path) or artspec.palette_hexes(spec)
             args.palette = ",".join(hexes) if hexes else None
         if args.expected_finish is None:
             args.expected_finish = artspec.spec_finish(spec)
