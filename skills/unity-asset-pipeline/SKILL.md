@@ -182,6 +182,15 @@ When the user asks to benchmark or improve the skills from popular Unity/game-ar
   entry (role animation catalog, frame-diff reports, palette/scale, camera-vs-composition,
   GameTheme equality) and rolls failures up into the registry result — the registry gate IS
   the deep gate. `--shallow` exists for quick structural passes only and is never a gate.
+- **Runtime-built UI is invisible to the scene-walk gate** (no serialized m_Sprite refs in the
+  scene). The teeth move to an edit-time-populated serialized catalog (id→asset, filled by the
+  scene builder from Approved paths — never Resources.Load) plus post-save reload verification
+  that every catalog entry resolves. See unity-card-games for the pattern.
+- **Contract self-consistency:** if a contract declares `runtime.prefab`, the import step must
+  BUILD it (prefab factory) — a declared-but-never-built package fails registry integrity.
+- QA profiles by asset class: cut-out sprite (default) / `--tile` / `--illustration`
+  (full-bleed opaque card art, splash, UI panels) / role `vfx` (free-sized). Pick the profile
+  from the contract role — the wrong profile mis-gates whole asset families.
 - **Acting roles must move:** contracts with role `player_character` / `enemy_unit` / `boss` /
   `tower` / `interactable` and `animation: null` FAIL unless `animation_waiver:` names the
   code-driven feedback replacing it ("they just disappear" is a shipped-game bug, not a slice

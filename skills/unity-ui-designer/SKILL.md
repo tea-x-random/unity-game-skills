@@ -217,7 +217,10 @@ Report: detected UI stack and why; screens built and that they went through `man
   with cleared text is an invisible-in-code, glaring-in-game overlay (field bug: a #1B1F3A@0.85
   center panel covered the screen all game because HideCenter() only disabled the label).
 - REQUIRED PlayMode assertion: in the Running state, no enabled UI `Image` covers ≥50% of the
-  canvas rect. One line of insurance against the whole class.
+  canvas rect. One line of insurance against the whole class. A legitimate full-screen board/
+  background Image (card games, boards) is exempted BY NAME and must sit at sibling index 0.
+- uGUI flash feedback: `Image.color` is multiplicative — white does NOTHING (same trap as
+  SpriteRenderer.color). Flash = a white overlay Image animating alpha, or a material swap.
 - Headless screenshot evidence MUST include the UI: batch mode has no game view, so overlay
   canvases are invisible to camera RT captures — switch the canvas to Screen-Space-Camera for
   the capture (then restore), or the evidence is UI-blind and overlay bugs ship.
