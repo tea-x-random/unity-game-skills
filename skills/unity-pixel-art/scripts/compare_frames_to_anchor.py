@@ -121,7 +121,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--action", action="store_true",
                    help="This is an ACTION clip (attack/hit/death): additionally require visible inter-frame motion — near-identical frames pass identity gates but read as a broken animation in game")
     p.add_argument("--min-inter-frame-motion", type=float, default=0.35,
-                   help="--action: minimum fraction of relevant pixels that must change between at least one consecutive frame pair (default 0.35 — calibrated live: a too-subtle slash that read as broken measured 0.27, a real run cycle 0.78; a 1px whole-body shift alone is ~0.30)")
+                   help="--action: minimum fraction of relevant pixels that must change between at least one consecutive frame pair (default 0.35 — calibrated live: a too-subtle slash that read as broken measured 0.27, a real run cycle 0.78; a 1px whole-body shift alone is ~0.30). PAIRED-OVERLAY EXCEPTION: when the attack ships a slash/impact VFX overlay sprite that carries the read, gate the body strip at 0.25 — the strip supports, the overlay sells")
     p.add_argument("--emit-subpalette", metavar="PATH",
                    help="Write the anchor's unique opaque colors as a color_image-compatible swatch PNG "
                         "(the derived-frame sub-palette for generate_pixel_art.py --color-image), then "

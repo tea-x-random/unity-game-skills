@@ -131,3 +131,11 @@ near-identical. Two REQUIRED checks for every gameplay-triggered clip:
 Death/kill feedback is part of the animation bar: enemies never "pop out of existence" — if no
 death strip exists yet, code-driven feedback (flash + squash + fade + particles) is the minimum
 and must be named in the asset contract's `animation_waiver`.
+
+**Weapon attacks are a COMPOSITE, not a strip:** pose-conditioned sprite generation animates the
+body but will not draw the weapon's arc — so a slash that relies on character frames alone
+under-reads no matter how good the poses are. The shipping recipe (field-verified): body strip
+(4 frames windup/strike/follow/recover @ ~14fps, FRONT-limb authored — see unity-pixel-art) +
+a separate slash/impact VFX overlay sprite code-animated over 0.15s (scale 0.7→1.15, slight
+rotate, fade) + ~0.05s hitstop on contact + a small lunge on the attacker. Fire gameplay damage
+on the strike frame via animation events, never on raw input.

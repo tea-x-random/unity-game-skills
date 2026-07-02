@@ -473,10 +473,11 @@ def validate_contract(contract_path: Path, args: argparse.Namespace) -> dict:
             add(checks, "scale.computed", False, "scale_valid cannot be computed: needs readable PNG source art, runtime.pixels_per_unit, and runtime.scale_meters.", {"dims": list(dims) if dims else None, "ppu": ppu_contract, "scale_meters": scale_m})
         if spec is not None and get_path(spec, "craft.finish") == "pixel":
             tile = get_path(spec, "craft.tile_size")
-            # Backgrounds are framed to the internal render target, not the tile
-            # grid (a 320x180 panel at tile_size 32 is correct art) — the
-            # tile-multiple rule applies to grid-placed assets only.
-            bg_roles = {"far_bg", "background"}
+            # Backgrounds are framed to the internal render target and VFX
+            # overlays are free-sized to their effect (a 48x48 slash arc at
+            # tile_size 32 is correct art) — the tile-multiple rule applies to
+            # GRID-PLACED assets only.
+            bg_roles = {"far_bg", "background", "vfx"}
             base_rr = get_path(spec, "craft.base_render_resolution")
             is_bg = c.get("role") in bg_roles or (isinstance(base_rr, list) and dims and list(dims) == list(base_rr))
             if isinstance(tile, int) and tile > 0 and dims and not is_bg:
