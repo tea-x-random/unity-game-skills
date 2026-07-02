@@ -106,6 +106,7 @@ Text-only animation drifts (identity changes frame to frame). For real, gameplay
      --output "Assets/<Game>/Art/_ArtDirection/sheets/biped_48.skeleton.json"
    ```
 3. **Author per-frame poses.** `skeleton_keypoints` is a list of frames; the LIVE API wants each frame as a **bare keypoint list** `[{"x", "y", "label", "z_index"}, ...]` (the script also accepts the friendlier `{"keypoints": [...]}` and normalizes). Labels are fixed: `NOSE, NECK, RIGHT/LEFT SHOULDER|ELBOW|ARM, RIGHT/LEFT HIP|KNEE|LEG, RIGHT/LEFT EYE|EAR`. `x`/`y` are **normalized 0–1** on the canvas (estimate-skeleton output is already normalized); `z_index` integer. Start from the game's skeleton template and move joints per frame (a walk = legs/arms swinging across ~4–8 frames).
+   **Attacks:** labels are the SUBJECT's anatomical sides — author the strike on the FRONT (facing-direction) limb (facing east: larger rest x); mirroring a pose set = negate x AND swap all LEFT/RIGHT label pairs. Author phases (windup/strike-smear/follow-through/recover), with wrist travel ≥0.25 normalized between windup and strike and whole-body deltas (nose/neck lean 0.04–0.07, hips 0.02–0.03). There is no weapon keypoint — the wrist path is the weapon-arc control; shift all keypoints ~20–25% toward the trailing edge so the model has empty canvas on the strike side for effect pixels (per PixelLab's skeleton-animation docs). Assert `--view`/`--direction` equals the reference anchor's stored facing before calling. Sanity-check estimate-skeleton output on stylized/armored sprites (limb-length symmetry, L/R ordering) before reusing it as a template.
 4. **Animate with the skeleton**, conditioning identity on the base character (canvas defaults to the reference; the live `guidance_scale` defaults to 4.0 server-side — pass `--guidance-scale` only to tune, which uses the raw HTTP path):
    ```bash
    python3 ../scripts/generate_pixel_art.py animate-skeleton \
@@ -116,6 +117,7 @@ Text-only animation drifts (identity changes frame to frame). For real, gameplay
      --output "Assets/<Game>/Art/Source/SourceImages/knight_walk.png"
    # writes knight_walk_00.png ... and a packed knight_walk_strip.png
    ```
+   For attack strips, do not rely on the generated frames to carry the slash — the model animates the body; the slash arc ships as a separate `pixflux` VFX overlay sprite (SKILL.md attack doctrine). Keep `fixed head` OFF for attacks.
 5. **Directional sheets:** `rotate` the base (and each keyframe) to other directions instead of regenerating from scratch (canvas defaults to the source; keep the sub-palette lock):
    ```bash
    python3 ../scripts/generate_pixel_art.py rotate \

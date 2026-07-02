@@ -120,6 +120,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--no-baseline", action="store_true", help="Skip the baseline check (e.g. jump/death frames)")
     p.add_argument("--action", action="store_true",
                    help="This is an ACTION clip (attack/hit/death): additionally require visible inter-frame motion — near-identical frames pass identity gates but read as a broken animation in game")
+    p.add_argument("--min-silhouette-motion", type=float, default=0.06,
+                   help="--action: minimum alpha-mask XOR fraction between at least one frame pair — raw pixel change is gameable by recolor/AA shimmer; the silhouette changing is what reads at 32-64px (default 0.06)")
+    p.add_argument("--strike-pair", type=int, default=None,
+                   help="--action: index of the frame pair (0-based) that must carry the LARGEST delta — for a 4-frame windup/strike/follow/recover strip pass 0 (windup->strike); a strip peaking on recover is mis-authored")
     p.add_argument("--min-inter-frame-motion", type=float, default=0.35,
                    help="--action: minimum fraction of relevant pixels that must change between at least one consecutive frame pair (default 0.35 — calibrated live: a too-subtle slash that read as broken measured 0.27, a real run cycle 0.78; a 1px whole-body shift alone is ~0.30). PAIRED-OVERLAY EXCEPTION: when the attack ships a slash/impact VFX overlay sprite that carries the read, gate the body strip at 0.25 — the strip supports, the overlay sells")
     p.add_argument("--emit-subpalette", metavar="PATH",
@@ -225,6 +229,7 @@ def main(argv: list[str] | None = None) -> int:
         import itertools
         frame_pixels = [img for _name, img in frames]
         deltas = []
+        sil_deltas = []
         for a, b in itertools.pairwise(frame_pixels):
             if a is None or b is None or a.size != b.size:
                 continue
@@ -232,16 +237,38 @@ def main(argv: list[str] | None = None) -> int:
             relevant = [i for i in range(len(pa)) if pa[i][3] > args.alpha_threshold or pb[i][3] > args.alpha_threshold]
             changed = sum(1 for i in relevant if pa[i] != pb[i])
             deltas.append(changed / max(1, len(relevant)))
+            # Silhouette delta: alpha-mask XOR fraction. Raw pixel change is
+            # gameable (recolor/AA shimmer passes yet reads as nothing); the
+            # SILHOUETTE changing is what survives at 32-64px (Cooper: staging
+            # is read from the silhouette).
+            sil_changed = sum(
+                1 for i in relevant
+                if (pa[i][3] > args.alpha_threshold) != (pb[i][3] > args.alpha_threshold)
+            )
+            sil_deltas.append(sil_changed / max(1, len(relevant)))
         max_delta = max(deltas) if deltas else 0.0
+        max_sil = max(sil_deltas) if sil_deltas else 0.0
         motion_pass = max_delta >= args.min_inter_frame_motion
+        sil_pass = max_sil >= args.min_silhouette_motion
+        # Monotonicity: the biggest change must land on the windup->strike pair
+        # (speed = distance/time — the strike gap must be the largest). A strip
+        # peaking on the recover frame is mis-authored.
+        strike_pass = True
+        if args.strike_pair is not None and deltas:
+            strike_pass = deltas.index(max(deltas)) == args.strike_pair
         motion_report = {
-            "pass": motion_pass,
+            "pass": motion_pass and sil_pass and strike_pass,
             "max_inter_frame_change": round(max_delta, 3),
             "per_pair": [round(d, 3) for d in deltas],
+            "silhouette": {"pass": sil_pass, "max": round(max_sil, 3),
+                           "per_pair": [round(d, 3) for d in sil_deltas],
+                           "floor": args.min_silhouette_motion},
+            "strike_pair": {"pass": strike_pass, "expected": args.strike_pair,
+                            "actual_max_pair": deltas.index(max(deltas)) if deltas else None},
             "floor": args.min_inter_frame_motion,
             "note": "action clips must visibly move; near-identical frames read as a broken animation in game",
         }
-        all_pass = all_pass and motion_pass
+        all_pass = all_pass and motion_report["pass"]
 
     report = {
         "tool": "unity-pixel-art/scripts/compare_frames_to_anchor.py",

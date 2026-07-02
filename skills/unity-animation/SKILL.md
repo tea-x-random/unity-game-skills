@@ -52,7 +52,7 @@ Generating per-state frame strips directly with Gemini is a **FALLBACK** — rea
 3. **Gate pixel strips with the frame-vs-anchor diff (MANDATORY before slicing):** `unity-pixel-art/scripts/compare_frames_to_anchor.py --anchor <approved_anchor.png> --strip <clip_strip.png> --cols <N>` — deterministic palette-membership + baseline/bbox-height + loose silhouette-IoU checks. Exit 1 = repair the failing frame (`inpaint` / `--init-images` freeze via `unity-pixel-art`), never re-roll the whole strip. Eyeballing does not replace this gate.
 4. **Extrude/pad the sheet** before import to prevent texture bleed: `unity-image-generator/scripts/extrude_atlas.py --rows 1 --cols <N> --extrude 2 --padding 2 ...`; slice using the manifest's frame rects.
 5. **Slice** in Unity (Sprite Editor → Grid by Cell Count / Sequence or manifest rects) with a consistent pivot/baseline. Reject sheets where the character visibly changes size or feet/ground contact drift.
-6. **Build Animation Clips** (one per state), set frame rate (10–14 fps reads well for casual), loop idle/walk, one-shot attack/death.
+6. **Build Animation Clips** (one per state). Loop idle/walk at uniform 10–14 fps. **Attack/hit clips NEVER use uniform spacing** — author per-keyframe times (weight lives in holds, strike frames stay 50–70ms for every weapon): sword 100/60/170/70ms, spear 200/60/220/70, hammer 300/60/330/110 (windup/strike-smear/follow-through/recover). Player windup ≤100ms (anticipation on player input reads as lag); enemy windup held ≥300ms (the tell). "Feels too slow/fast" is ALWAYS a keyframe-time edit here, never a PixelLab regeneration — poses are PixelLab's artifact, timing is Unity's.
 7. **Animator Controller** with states + transitions driven by parameters/triggers (`Speed` float, `Fire` trigger, `IsDead` bool).
 8. **Pack frames into a Sprite Atlas** to keep draw calls down.
 
@@ -79,7 +79,7 @@ Layer procedural juice on authored animation: squash-stretch on land/impact, ant
 Score each; fix any that fail before "done":
 
 - **Nothing static that should move** — no T-pose/frozen asset where motion is expected (auto-fail).
-- **Anticipation & follow-through** present on actions (wind-up before, settle after) — not a single linear pose change.
+- **Anticipation & follow-through match the actor** — enemy attacks: held ≥0.3s windup tell; player attacks: ≤100ms windup (strike by frame 1–2) with weight sold in a held follow-through. A symmetric evenly-progressing swing fails for BOTH.
 - **Smoothness** — enough frames / proper interpolation; no visible stutter at gameplay speed.
 - **Loops seamless** — idle/walk/run cycle with no pop at the loop point.
 - **Gameplay sync** — projectile/damage fires on the correct frame via an Animation Event.
@@ -123,19 +123,40 @@ near-identical. Two REQUIRED checks for every gameplay-triggered clip:
    `animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("slash")`
    within N frames, then back to the default state. One test per input-reachable state.
 2. **Visible-motion gate** (content correctness): action strips (attack/hit/death) must pass
-   `compare_frames_to_anchor.py --action` (≥0.35 inter-frame pixel change; a real run cycle
-   measures ~0.78, a too-subtle slash that shipped broken measured 0.27). Selling a fast action
-   also usually needs code-side motion (a 0.2s lunge/recoil on the visual child) — animation
-   frames alone at 3 frames/0.2s under-read.
+   `compare_frames_to_anchor.py --action` (≥0.35 inter-frame pixel change solo, 0.25 when paired
+   with a VFX overlay; a real run cycle measures ~0.78, a too-subtle slash that shipped broken
+   measured 0.27). Pixel change alone is gameable (AA shimmer passes, a recolored same-silhouette
+   frame passes): also require the SILHOUETTE (alpha-mask) delta to move, and the largest
+   inter-frame delta to land on the windup→strike pair (`--strike-pair`) — a strip whose biggest
+   change is the recover frame is mis-authored. Selling a fast action also needs the code-side
+   impact stack (lunge, hitstop, overlay VFX — see unity-gameplay-systems combat-impact
+   defaults); frames alone at 3 frames/0.2s under-read.
 
 Death/kill feedback is part of the animation bar: enemies never "pop out of existence" — if no
 death strip exists yet, code-driven feedback (flash + squash + fade + particles) is the minimum
 and must be named in the asset contract's `animation_waiver`.
 
+## Attack timing doctrine (player vs enemy are OPPOSITES)
+
+- **Player attacks: near-zero anticipation.** The strike must visually fill the hitbox area by
+  frame 1–2 (saint11); at 3 frames the phase list is strike-smear/follow-through/recover — no
+  windup frame at all. Weight is sold AFTER contact: the follow-through gets the longest hold,
+  and the Animator returns control early (exit time < 1.0 or a `CanAct` event at follow-through
+  start) so the settle plays while input is already accepted. Input-to-visible-motion must stay
+  under ~100ms: start the code-side lunge/SFX on the input frame, attack transitions get
+  duration 0 + Has Exit Time off.
+- **Enemy attacks: the windup IS the gameplay.** Hold the windup pose ≥0.3s (one windup sprite
+  with a 300ms+ keyframe is cheaper than generating frames); the active strike phase is
+  near-instant. Enemies with multiple attacks need silhouette-DISTINCT windups per attack
+  (different direction/height), checkable with the same silhouette-diff machinery as the
+  intra-clip motion gate.
+- **Heavy vs light = hold durations, not more frames.** Strike frames stay 50–70ms regardless
+  of weapon; only windup/follow-through holds grow (sword 400ms total, spear 550, hammer 800).
+
 **Weapon attacks are a COMPOSITE, not a strip:** pose-conditioned sprite generation animates the
 body but will not draw the weapon's arc — so a slash that relies on character frames alone
 under-reads no matter how good the poses are. The shipping recipe (field-verified): body strip
-(4 frames windup/strike/follow/recover @ ~14fps, FRONT-limb authored — see unity-pixel-art) +
+(4 frames windup/strike/follow/recover with NON-uniform keyframe times — strike 50–70ms, follow-through held longest, per-weapon totals sword 400/spear 550/hammer 800ms; FRONT-limb authored — see unity-pixel-art) +
 a separate slash/impact VFX overlay sprite code-animated over 0.15s (scale 0.7→1.15, slight
-rotate, fade) + ~0.05s hitstop on contact + a small lunge on the attacker. Fire gameplay damage
+rotate, fade) + the combat-impact stack from unity-gameplay-systems (hitstop 0.08-0.15s per-entity, lunge, defender knockback+squash, shader flash, trauma shake, contact SFX). Fire gameplay damage
 on the strike frame via animation events, never on raw input.
