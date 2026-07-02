@@ -250,10 +250,14 @@ def validate(args: argparse.Namespace) -> dict:
         ))
 
     # Coverage / bbox / padding / halo only apply to transparent foreground sprites.
-    # Full-bleed tiles and backgrounds are intentionally opaque edge-to-edge.
+    # Full-bleed tiles, backgrounds, and ILLUSTRATIONS (card art, splash art,
+    # UI panels) are intentionally opaque edge-to-edge — 1.000 coverage is the
+    # DESIGN, not a defect. Gate them with --illustration (palette/finish
+    # checks still run; cut-out geometry checks do not).
+    cutout = not args.tile and not args.illustration
     bbox = None
     padding = None
-    if not args.tile:
+    if cutout:
         checks.append(Check(
             "silhouette.coverage",
             "pass" if args.min_coverage <= coverage <= args.max_coverage else "fail",
@@ -262,7 +266,7 @@ def validate(args: argparse.Namespace) -> dict:
             {"min": args.min_coverage, "max": args.max_coverage},
         ))
         bbox = alpha_bbox(alpha, width, height, args.alpha_threshold)
-    if not args.tile and bbox:
+    if cutout and bbox:
         left, top, right, bottom = bbox
         padding = {
             "left": left,
@@ -306,7 +310,7 @@ def validate(args: argparse.Namespace) -> dict:
             {"x_ratio": loose_x, "y_ratio": loose_y, "padding": padding},
             {"max_loose_padding_ratio": args.max_loose_padding_ratio},
         ))
-    elif not args.tile:
+    elif cutout:
         checks.append(Check("alpha.bbox", "fail", "No opaque silhouette found."))
 
     # Edge halo detection: matte-colored RGB values on the silhouette edge almost
@@ -468,6 +472,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--square", action="store_true", help="Require square dimensions (tiles/icons/atlases)")
     p.add_argument("--power-of-two", action="store_true", help="Require power-of-two dimensions")
     p.add_argument("--tile", action="store_true", help="Enable seamless-tile checks (edge wrap difference)")
+    p.add_argument("--illustration", action="store_true",
+                   help="Full-bleed opaque artwork (card illustrations, splash/UI panels): skip cut-out-sprite geometry checks (coverage band, padding, bbox, edge halo) — 1.000 coverage is the design. Palette/finish checks still run")
     p.add_argument("--wrap-axes", choices=["both", "horizontal", "vertical"], default="both",
                    help="Which edges must wrap seamlessly: role-aware — a side-scroller ground band repeats only horizontally (default: both)")
     p.add_argument("--max-wrap-difference", type=float, default=0.08, help="Max opposite-edge RGB difference for --tile (default: 0.08)")
