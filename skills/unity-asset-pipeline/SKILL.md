@@ -136,6 +136,13 @@ A candidate fails automatically if it cannot pass all of these. The screenshot i
 
 The registry (`Assets/<Game>/Art/Approved/registry.yaml`) is the **only** index scene-building agents read. Schema and the "no raw files in scenes" rule: `references/registry-schema.md`. Each entry references a contract + prefab + passing QA/screenshot. `validate_asset_manifest.py --registry` re-validates every entry. If an asset is not in the registry, it does not exist for level assembly.
 
+Two shape requirements the validator enforces (not optional):
+
+- **Every registry entry REQUIRES a `qa:` block** — an entry without one fails validation outright; `qa.*` flags come from the validators, never hand-authored (same rule as contracts).
+- **The registry-level `composition_profile:` key is effectively REQUIRED** — coherence checks are default-on, and registry mode resolves `composition.yaml` from this key; omitting it fails the camera-contract coherence pass rather than skipping it.
+
+Scene assembly must reference registry art only **through prefab instances** (plain-value instance overrides like tiled `drawMode`/`size` are fine); direct scene-object references to project-local `.mat`/`.png` fail `check_scene_registry.py` — details in `references/editor-asset-pipeline.md` §13.
+
 ## Beauty cell first — build one screen before a level
 
 Before generating dozens of assets, require ONE polished, screen-sized test scene (`BeautyCell_01`) containing: one hero/gameplay object, two supporting prop families, one environment kit, one lighting profile, one UI card, one effect layer, captured at one target-device resolution. **Nothing else expands until this scene is approved.** This catches the real failures early: assets too similarly sized, no contrast between interactable and decoration, over-detailed background, props with incompatible camera angles, mismatched shadow direction, UI unrelated to the world. Details: `references/beauty-cell.md`.

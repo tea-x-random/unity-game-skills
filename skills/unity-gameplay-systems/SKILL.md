@@ -32,6 +32,8 @@ Starting a new casual game, repairing a weak prototype, adding mechanics/entitie
 
 Load `references/csharp-patterns.md` when writing C# (pooling, Input System actions, state machine, singleton manager, events).
 
+Load `references/headless-editor-recipes.md` whenever building/testing WITHOUT a live Editor/MCP (batch-mode `-executeMethod`/`-runTests` runs): URP 17.5 2D asmdef split, headless URP activation, the NewScene prefab-ref invalidation + VerifyWired rule, synchronous ImportPackageImmediately, `RenderPipeline.StandardRequest` screenshots, and batch-run mechanics — all verified on a real 6000.5 build.
+
 ## Project / scene setup via MCP (start the slice fast)
 
 ```text

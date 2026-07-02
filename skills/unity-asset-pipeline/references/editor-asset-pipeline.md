@@ -376,3 +376,47 @@ Gate before approval:
 - BeautyCell LightingTest proves the asset reacts consistently to the shared 2D lights.
 
 Do not generate normal/mask maps for a flat unlit style unless the art-spec says the style uses 2D lighting; this is a capability gate, not a universal requirement.
+
+## 11) Strip slicing on Unity 6000.5 (ISpriteEditorDataProvider)
+
+The Sprite Editor data API is the current way to slice animation strips headlessly. Exact requirements (verified against the live 2d.sprite package on 6000.5):
+
+- The consuming Editor asmdef MUST reference **`Unity.2D.Sprite.Editor`** (namespace `UnityEditor.U2D.Sprites`) — the types are not in `UnityEditor` proper.
+- Set the importer to `SpriteImportMode.Multiple` (via `TextureImporterSettings`) and `SaveAndReimport()` FIRST, then run the data provider pass, `Apply()`, and `SaveAndReimport()` again.
+- Every new `SpriteRect` needs `spriteID = GUID.Generate()` — a default GUID produces broken sub-assets.
+- Pair names to IDs with **`new SpriteNameFileIdPair(name, guid)`** — the `long fileId` constructor/property is **obsolete** on 6000.5 (`GetFileGUID`/`SetFileGUID` replace it).
+- Register the pairs via **`ISpriteNameFileIdDataProvider.SetNameFileIdPairs`** so name→fileID stays stable and scene/prefab/AnimationClip references survive reimports.
+
+```csharp
+var factory = new SpriteDataProviderFactories();
+factory.Init();
+var dp = factory.GetSpriteEditorDataProviderFromObject(textureImporter);
+dp.InitSpriteEditorDataProvider();
+var rects = Enumerable.Range(0, frameCount).Select(i => new SpriteRect {
+    name = $"{baseName}_{i}",
+    rect = new Rect(i * frameW, 0, frameW, frameH),
+    alignment = SpriteAlignment.Custom, pivot = new Vector2(0.5f, 0f),
+    spriteID = GUID.Generate()
+}).ToArray();
+dp.SetSpriteRects(rects);
+dp.GetDataProvider<ISpriteNameFileIdDataProvider>()
+  ?.SetNameFileIdPairs(rects.Select(r => new SpriteNameFileIdPair(r.name, r.spriteID)));
+dp.Apply();
+textureImporter.SaveAndReimport();
+```
+
+Then verify: `AssetDatabase.LoadAllAssetsAtPath(path).OfType<Sprite>()` has the expected count AND names — log FAIL lines on mismatch.
+
+## 12) URP 2D batcher headless texture-binding rule: one Sprite-Unlit material per asset
+
+Observed on 6000.5 + URP 17.5, batch-mode renders (edit-mode `StandardRequest` captures AND PlayMode): SpriteRenderers **sharing one material** (the default `Sprite-Lit-Default`) with different sprite textures get merged into one draw that binds the FIRST batch texture — every sprite in the frame renders with the background's texture. Sprite/texture references are all correct; the merge is the bug, and nothing errors.
+
+**Rule:** assign **one material per asset** using the art-spec shader family (`Universal Render Pipeline/2D/Sprite-Unlit-Default`) with the asset's texture pre-bound as `mainTexture`. Instantiate from the package template `Packages/com.unity.render-pipelines.universal/Runtime/Materials/Sprite-Unlit-Default.mat`, save under `Assets/<Game>/Materials/<asset_id>.mat`, set `SpriteRenderer.sharedMaterial` in the prefab factory. Distinct materials cannot be merged across assets; per-sprite textures within ONE asset's material (animation strips) still bind correctly. This also satisfies the art-spec mobile budget (`max_materials_per_prop: 1`) and Unlit needs no Light2D.
+
+## 13) Scene art references must go THROUGH registry prefab instances
+
+`check_scene_registry.py` allows a scene art reference (guid with an art extension: .png/.mat/.prefab/…) ONLY if it is a registry prefab or a file inside a registered asset's approved folder. Consequences for scene assembly:
+
+- A plain scene GameObject whose SpriteRenderer references a project-local `.mat` or approved `.png` **directly** puts that guid in the `.unity` file — a `.mat` under `Assets/<Game>/Materials/` FAILS the gate.
+- **Reference art only through registry prefab INSTANCES.** A prefab instance serializes just `m_SourcePrefab` (the registry prefab guid — allowed); the sprite/material references stay inside the prefab file, which the gate does not scan.
+- **Instance overrides with plain values are safe**: e.g. a tiled ground band = the `StoneTile` registry prefab instantiated with `drawMode = Tiled`, `size = (22, 3)` overrides — no guid enters the scene. Never rebuild the same visual as a raw scene SpriteRenderer to "save a prefab".

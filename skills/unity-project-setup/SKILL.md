@@ -125,6 +125,8 @@ Reference asmdefs by name; keep cross-references minimal (fewer edges = shorter 
 
 - **Vendor SDKs that ship as `.unitypackage` / `.framework`** (not UPM) go under `Assets/ThirdParty/` (or `Plugins/`) and are **LFS-tracked**, kept out of `Assets/<Game>/`. Note the version in a README so an upgrade is intentional.
 - **Don't hand-edit `packages-lock.json`.** Let Unity (or `manage_packages` via MCP) resolve; commit the result.
+- **Unity 6000.5: NEVER add `com.unity.textmeshpro`.** The editor's own PackageManager manifest marks it deprecated (`removeOnProjectUpgrade: true`) — TMP now ships **inside** `com.unity.ugui` 2.5.0 (built-in package; asmdef name is still `Unity.TextMeshPro`, TMP essentials `.unitypackage` lives at `Packages/com.unity.ugui/Package Resources/`). A pinned standalone TMP package can throw the project into Safe Mode; remove it from `manifest.json` and reference `Unity.TextMeshPro` as usual.
+- **Fresh projects default `activeInputHandler: 0` (legacy-only) — Input System code is silently dead** (actions never fire, no error). Set it to 2 (Both) or 1 (Input System) in `ProjectSettings/ProjectSettings.asset` BEFORE first launch: `sed -i '' 's/activeInputHandler: 0/activeInputHandler: 2/' ProjectSettings/ProjectSettings.asset` (safe scalar text edit), plus a belt-and-braces Editor check via `new SerializedObject(Unsupported.GetSerializedAssetInterfaceSingleton("PlayerSettings")).FindProperty("activeInputHandler")`. The value takes effect on the next Editor launch — each batch run is a fresh launch, so run 1 sets it and test runs inherit it.
 
 ## Versioning & build numbers
 

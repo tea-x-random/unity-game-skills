@@ -412,13 +412,22 @@ def validate(args: argparse.Namespace) -> dict:
 
     if args.tile:
         wrap = edge_wrap_difference(rgba, width, height)
-        ok = wrap["max"] <= args.max_wrap_difference
+        # Role-aware axes: a side-runner ground band only repeats horizontally
+        # (the top edge is the visible surface, the bottom is buried), so gate
+        # only the axes the tile's role actually wraps on.
+        axis_values = {
+            "both": wrap["max"],
+            "horizontal": wrap["left_right"],
+            "vertical": wrap["top_bottom"],
+        }
+        gated = axis_values[args.wrap_axes]
+        ok = gated <= args.max_wrap_difference
         checks.append(Check(
             "tile.edge_wrap",
             "pass" if ok else "fail",
-            f"Opposite-edge color difference max is {wrap['max']:.4f}; lower is more seamless.",
+            f"Opposite-edge color difference ({args.wrap_axes}) is {gated:.4f}; lower is more seamless.",
             wrap,
-            {"max_wrap_difference": args.max_wrap_difference},
+            {"max_wrap_difference": args.max_wrap_difference, "wrap_axes": args.wrap_axes},
         ))
 
     fail_count = sum(1 for c in checks if c.status == "fail")
@@ -459,6 +468,8 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--square", action="store_true", help="Require square dimensions (tiles/icons/atlases)")
     p.add_argument("--power-of-two", action="store_true", help="Require power-of-two dimensions")
     p.add_argument("--tile", action="store_true", help="Enable seamless-tile checks (edge wrap difference)")
+    p.add_argument("--wrap-axes", choices=["both", "horizontal", "vertical"], default="both",
+                   help="Which edges must wrap seamlessly: role-aware — a side-scroller ground band repeats only horizontally (default: both)")
     p.add_argument("--max-wrap-difference", type=float, default=0.08, help="Max opposite-edge RGB difference for --tile (default: 0.08)")
     p.add_argument("--art-spec", help="Path to the governing art-spec.yaml (default: $UNITY_ART_SPEC or canonical Assets paths); fills --palette/--expected-finish defaults")
     p.add_argument("--no-art-spec", action="store_true", help="Explicit override: validate without an art-spec (exploratory work only)")

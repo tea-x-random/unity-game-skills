@@ -69,6 +69,13 @@ Do not apply one identical prompt/style intensity to every layer. The background
 
 If a ground tile has the same bold black outline and hot accent palette as characters, the screenshot will look busy even when each asset is well drawn. Fix layer contrast before adding post-processing.
 
+## Repeating surfaces (scrolling games)
+
+Two scorecard deductions that recur in side-scrollers/runners:
+
+- **Repeating backgrounds:** a single background panel tiled 2x+ across the view exposes its internal features (star rows, cloud bands, silhouette clusters) as visible periodic banding — the eye locks onto the repeat immediately in motion. For scrolling games, generate **2+ background variant panels and alternate them A-B-A-B**, or require the panel's internal features to be non-periodic (no evenly spaced rows/bands) before approval.
+- **Ground band proportion:** a uniform ground texture filling the lower quarter+ of the screen reads as empty dead space. Cap the flat ground band at **~1/6 of screen height**, or require a **top-edge accent row** (grass lip, highlight course, trim tiles) where the gameplay line meets the band so the boundary reads as designed, not truncated.
+
 ## Contact shadows / grounding
 
 Every object that touches the world needs a consistent grounding treatment. Prefer a shared soft blob shadow or contact-AO prefab referenced by `shadow_profile`, with one global light/shadow direction. Do not rely on shadows baked into individual generated PNGs — they disagree once composited and break the BeautyCell.

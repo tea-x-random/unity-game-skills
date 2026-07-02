@@ -68,6 +68,10 @@ can still author a complete, openable project from files alone — do this inste
 - **State the boundary honestly:** report that the project is code-complete but **not yet compiled or
   run**, and list the one-time manual steps (install Unity, open, run the build menu, Play). Never
   claim scene work, a clean compile, or screenshots that did not happen.
+- **When Unity IS installed (just no MCP), use the proven batch-mode playbook:**
+  `unity-gameplay-systems/references/headless-editor-recipes.md` — URP 2D asmdef split, headless URP
+  activation, NewScene prefab-ref invalidation + VerifyWired, synchronous ImportPackageImmediately,
+  `RenderPipeline.StandardRequest` screenshots, batch-run mechanics (verified on a real 6000.5 build).
 
 ## Step 2 — Decide 2D vs 3D and load the right sibling skills
 
@@ -198,7 +202,7 @@ Branch the DAG on the Step 2 pipeline decision (= art-spec `craft.finish`):
 
 Scale VOLUME by genre — compression shrinks families and canon passes, never gates 2 and 7:
 
-- **Casual/hyper-casual puzzle:** compressed — art-spec + master palette + 1–2 asset families (pieces, board/background, key UI); steps 3–4 collapse into one canon pass (mascot + piece set); `composition.yaml` optional for a single static screen.
+- **Casual/hyper-casual puzzle:** compressed — art-spec + master palette + 1–2 asset families (pieces, board/background, key UI); steps 3–4 collapse into one canon pass (mascot + piece set); `composition.yaml` stays REQUIRED but may be minimal (camera profile + layers + key_light_direction) — the asset-pipeline validator's coherence checks are default-on and fail registries without a resolvable composition profile.
 - **Mid-core / pixel RPG:** full DAG — canon per recurring character, golden-first 80/20 families, `composition.yaml` required.
 - **AAA / showcase 3D:** full DAG + `unity-aaa-graphics` per-surface sourcing decision + BeautyCell visual regression per family.
 

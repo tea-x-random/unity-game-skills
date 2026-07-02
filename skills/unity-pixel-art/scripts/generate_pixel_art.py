@@ -662,6 +662,8 @@ def _build_parser() -> argparse.ArgumentParser:
     pixflux.add_argument("--no-background", action="store_true", help="Transparent background")
     pixflux.add_argument("--text-guidance-scale", type=float, default=8.0, help="1.0-20.0")
     pixflux.add_argument("--isometric", action="store_true")
+    pixflux.add_argument("--coverage-percentage", type=float,
+                         help="Percent of canvas the subject should cover (0-100); helps prevent duplicated/stacked subjects on tall canvases")
     pixflux.add_argument("--init-image", help="Initial image to start from")
     pixflux.add_argument("--init-image-strength", type=int, default=300, help="0-1000")
     _add_style_args(pixflux)
@@ -683,6 +685,8 @@ def _build_parser() -> argparse.ArgumentParser:
              "the anchor's IDENTITY, not just its style.",
     )
     bitforge.add_argument("--text-guidance-scale", type=float, default=8.0, help="1.0-20.0 (live API default 8.0)")
+    bitforge.add_argument("--coverage-percentage", type=float,
+                         help="Percent of canvas the subject should cover (0-100); helps prevent duplicated/stacked subjects on tall canvases")
     bitforge.add_argument("--extra-guidance-scale", type=float, default=None, help="DEPRECATED in the live API — leave unset; tuning it is likely a no-op")
     bitforge.add_argument("--init-image", help="Initial image to start from (THE working golden-conditioning channel; autofilled from conditioning.golden_assets)")
     bitforge.add_argument("--init-image-strength", type=int, default=None,
@@ -894,6 +898,7 @@ def main(argv: list[str] | None = None) -> int:
             "negative_description": args.negative_description,
             "text_guidance_scale": args.text_guidance_scale,
             "no_background": bool(args.no_background),
+            "coverage_percentage": getattr(args, "coverage_percentage", None),
             "isometric": bool(args.isometric),
             "view": args.view,
             "direction": args.direction,
@@ -915,6 +920,7 @@ def main(argv: list[str] | None = None) -> int:
             "extra_guidance_scale": args.extra_guidance_scale,
             "style_strength": args.style_strength,
             "no_background": bool(args.no_background),
+            "coverage_percentage": getattr(args, "coverage_percentage", None),
             "isometric": bool(args.isometric),
             "view": args.view,
             "direction": args.direction,
