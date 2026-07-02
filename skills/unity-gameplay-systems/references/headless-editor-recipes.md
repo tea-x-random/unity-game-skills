@@ -116,3 +116,21 @@ Screen-Space-Overlay canvases never appear in camera RT captures (no game view i
 produce UI-inclusive evidence: temporarily switch the canvas to Screen-Space-Camera (assign the
 game camera, plane distance ~1), render via RenderPipeline.SubmitRenderRequest(StandardRequest),
 then restore Overlay mode. State in the report which capture path was used.
+
+## Long lock-waits and background-task caps
+
+Waiting out a project lock inside one capped background shell gets killed mid-wait (exit 144)
+with unflushed progress. Split the retry from the execution (short probe runs, or a Monitor-style
+until-loop), and treat the user's live Editor as a first-class scheduling constraint: probe
+`pgrep -f "projectpath <project>"` before every batch chain, and coordinate with the user —
+never kill their session.
+
+## Contract-driven frame counts (zero-touch strip revisions)
+
+A frame-count change on an animation strip ripples through three editor-script sites (importer
+slice count, clip keyframes, import-verify names). Read `animation.clips[].frames` (and fps/loop)
+from the asset-contract YAML in the editor scripts instead of hardcoding — regenerated strips
+then re-import with zero code edits. Reusable runtime patterns proven here: single pooled VFX
+instance keyed to an action cooldown (cooldown > VFX lifetime = no pool bookkeeping), and
+hitstop via the game loop's OWN clock (drain dt, never Time.timeScale) — deterministic,
+test-friendly, and right for turn/card games too.
