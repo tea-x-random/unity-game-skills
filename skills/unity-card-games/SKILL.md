@@ -1,6 +1,6 @@
 ---
 name: unity-card-games
-description: "GENRE layer for CARD GAMES in Unity — battlers (Hearthstone/PTCGP-like), deckbuilders, solitaires, TCG boards. Owns the card-genre conventions: the rules-spec gate (retaliation/summoning-sickness/termination decided BEFORE code), engine-free rules core with an attack EVENT LOG for view playback, greedy-AI-through-the-public-API with a legality audit, card art as runtime.type ui contracts (illustration QA profile, canon-conditioned character cards), frame compositing (measured window fractions, frame-at-bottom stack, crop-to-cover fitters), anchor-fraction hand fans, the drag-drop trio, one-rules-path for drag AND click, card impact feel (play-pop, lunge + own-clock hitstop + overlay flash + floating damage numbers), and registry teeth for runtime-built UI. DEFERS generation, QA gates, contracts/registry mechanics, and engine recipes to the core skills (unity-image-generator, unity-asset-designer, unity-asset-pipeline, unity-gameplay-systems, unity-ui-designer, unity-animation). Triggers on: card game, card battler, TCG, CCG, deckbuilder, Hearthstone, PTCG, hand of cards, drag card to board, mana curve, card frame, card back, board lanes, turn-based duel."
+description: "GENRE layer for CARD GAMES in Unity — battlers (Hearthstone/PTCGP-like), deckbuilders, solitaires, TCG boards. Owns the card-genre conventions: the rules-spec gate (retaliation/summoning-sickness/termination decided BEFORE code), engine-free rules core with an attack EVENT LOG for view playback, greedy-AI-through-the-public-API with a legality audit, card art as runtime.type ui contracts (illustration QA profile, canon-conditioned character cards), frame compositing (measured window fractions, frame-at-bottom stack, crop-to-cover fitters), anchor-fraction hand fans, DragLayer drag-drop rules with orphan-count assertions, one-rules-path for drag AND click, card impact feel (play-pop, lunge + own-clock hitstop + overlay flash + floating damage numbers), and registry teeth for runtime-built UI. DEFERS generation, QA gates, contracts/registry mechanics, and engine recipes to the core skills (unity-image-generator, unity-asset-designer, unity-asset-pipeline, unity-gameplay-systems, unity-ui-designer, unity-animation). Triggers on: card game, card battler, TCG, CCG, deckbuilder, Hearthstone, PTCG, hand of cards, drag card to board, mana curve, card frame, card back, board lanes, turn-based duel."
 ---
 
 # Unity Card Games (genre layer)
@@ -84,8 +84,9 @@ Card combat has forks that silently change every test. Lock them in the spec fir
   (reparenting, raycast toggles, end-events), and a click-only test suite shipped a drag-only
   ghost bug. Simulate the real drag events (ExecuteEvents + synthesized PointerEventData).
 - **One rules path**: drag AND click-fallback funnel into the same DropOnLane/DropOnHero —
-  PlayMode tests then drive the real handlers without synthesizing pointer events. No-target
-  spells need an explicit gesture (drop-on-own-hero or second click).
+  RULES tests drive the shared handlers directly; VIEW-lifecycle tests still exercise the real
+  drag events (bullet above). No-target spells need an explicit gesture (drop-on-own-hero or
+  second click).
 - The board background is the ONE legitimate full-screen Image: exempt it from the
   no-full-screen-overlay assertion BY NAME and assert it sits at sibling index 0.
 - Naming: `ART_*` (registry sprites) / `UI_*` (intentional procedural chrome) / `FX_*`
