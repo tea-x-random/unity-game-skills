@@ -209,3 +209,17 @@ Report: detected UI stack and why; screens built and that they went through `man
 - Added constraint/peer highlight for grid puzzles (Lerp region color toward white ~0.22 on row/col/region peers; selected brightest, conflict overrides) and consumable-button count badge + disabled state (top-right circular badge; at 0 set interactable=false, dim via CanvasGroup, hide badge, AND disable PressFeedback so a dead button gives no tap SFX/scale).
 - Added premium menu patterns (mascot circle header, glossy circular corner icon-buttons + gear popover instead of full-width pills, layered wide buttons, difficulty pips) and the reveal-animation gotcha (a `CardShadow` sibling at the card index makes the shadow child 0, so `GetChild(0)` spring-reveals the shadow — target `transform.Find("Card")` by name).
 - Root-caused the recurring menu/text-consistency churn and encoded the systemic fixes. Added four sections — (1) **Design tokens**: a single source of truth for typography scale (named sizes, not literals), spacing scale, semantic color roles, radii, and icon/touch-target sizes, expressed as fields on the runtime theme object (`GameTheme`) read by the builder (`AppRoot`); grounded in the real bug (16 orphan magic font-size literals across 3 screens, three forked `Label` factories). (2) **Shared component library** (atomic design): one factory per widget (Label/Button/Card/IconButton) used by EVERY screen so restyling glossy→flat is a one-place change; don't fork the factory per screen. (3) **User-facing strings: single source of truth** — route every repeated label through one provider (`DifficultyRules.DisplayName`), no duplicated literals; this is what makes CJK/localization feasible. (4) **TMP fonts for international text** — decide glyph coverage UP FRONT to avoid tofu; dynamic-atlas `TMP_FontAsset` (a script-appropriate display font, samplingPointSize 110 / atlas 2048² / padding 11 / SDFAA) set as the project TMP default; fallback lists + `TryAddCharacters` pre-warm. Plus a new **UI consistency audit** section + `references/checklists/ui-consistency.md`. Sources cited inline: USWDS/Adobe Spectrum/UXPin design tokens, Brad-Frost atomic design (Justinmind/LogRocket), Apple HIG typography + 44pt, Unity Learn TMP font-asset creation + CJK dynamic atlas, SimpleLocalize/Microsoft i18n single-source-of-truth.
+
+## State-driven panel visibility (hard rules)
+
+- Every full-screen or center panel maps 1:1 to game states (Ready/Running/GameOver/Pause).
+  Toggle the PANEL ROOT GameObject, never just its text/children — a panel Image left enabled
+  with cleared text is an invisible-in-code, glaring-in-game overlay (field bug: a #1B1F3A@0.85
+  center panel covered the screen all game because HideCenter() only disabled the label).
+- REQUIRED PlayMode assertion: in the Running state, no enabled UI `Image` covers ≥50% of the
+  canvas rect. One line of insurance against the whole class.
+- Headless screenshot evidence MUST include the UI: batch mode has no game view, so overlay
+  canvases are invisible to camera RT captures — switch the canvas to Screen-Space-Camera for
+  the capture (then restore), or the evidence is UI-blind and overlay bugs ship.
+- Safe area: HUD content lives under a SafeAreaFitter container (anchors from Screen.safeArea),
+  not raw canvas corners.

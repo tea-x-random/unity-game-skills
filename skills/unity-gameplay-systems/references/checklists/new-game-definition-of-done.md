@@ -14,3 +14,15 @@ Do not claim a new game or first playable slice is complete until all pass. Each
 - [ ] **(Recommended) PlayMode test green.** `run_tests(mode="PlayMode")` + `get_test_job` asserts the loop (e.g. input raises score, hazard triggers respawn).
 
 If any box is unchecked, the slice is not done — report which and why.
+
+## Mobile slice minimums (any iOS-targeted slice — not just release builds)
+
+- [ ] Orientation decided and LOCKED in PlayerSettings (runner/landscape vs puzzle/portrait)
+- [ ] `Application.targetFrameRate = 60` set at boot
+- [ ] HUD under a SafeAreaFitter (Screen.safeArea anchors)
+- [ ] Aspect robustness proven: screenshots at 16:9, 19.5:9 (iPhone), and one extreme (ultrawide
+      or 4:3) — camera framing decision explicit (PixelPerfectCamera cropFrame / letterbox) so
+      composition holds and scroll-wrap distances are never exceeded by the visible width
+- [ ] iOS backend set (IL2CPP + bundle id placeholder) even if no build is run
+- [ ] Kill/pickup/damage feedback exists for every gameplay event (animation or code-driven
+      flash/squash/particles) — nothing pops out of existence silently

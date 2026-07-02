@@ -175,3 +175,14 @@ It owns the contract, the validators, the prefab factory, atlas/addressables met
 ## Keep this skill current
 
 When the user asks to benchmark or improve the skills from popular Unity/game-art workflows, use `docs/EXTERNAL_BENCHMARK_WORKFLOW.md`. Promote only high-signal findings into contract fields, validators, Editor snippets, or skill rules. Current benchmark-derived gates here include SpriteAtlas groups, Import Presets/AssetPostprocessor, Addressables labels, and optional 2D secondary textures.
+
+## Deep registry validation + acting-role animation gate
+
+- `validate_asset_manifest.py --registry ...` runs the FULL per-contract check-set for every
+  entry (role animation catalog, frame-diff reports, palette/scale, camera-vs-composition,
+  GameTheme equality) and rolls failures up into the registry result — the registry gate IS
+  the deep gate. `--shallow` exists for quick structural passes only and is never a gate.
+- **Acting roles must move:** contracts with role `player_character` / `enemy_unit` / `boss` /
+  `tower` / `interactable` and `animation: null` FAIL unless `animation_waiver:` names the
+  code-driven feedback replacing it ("they just disappear" is a shipped-game bug, not a slice
+  shortcut). The waiver text is the accountability record — review it at promotion time.

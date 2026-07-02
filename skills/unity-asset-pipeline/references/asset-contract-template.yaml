@@ -36,6 +36,10 @@ runtime:
   prefab: Assets/<Game>/Art/Prefabs/Environment/MeadowTreeA.prefab
   approved_folder: Assets/<Game>/Art/Approved/meadow_tree_a
   pivot: bottom_center             # center | bottom_center | custom
+                                   # bottom_center means the VISUAL FEET (bottom-most opaque alpha row),
+                                   # NOT the canvas bottom — generated canvases carry transparent padding
+                                   # rows below the feet (3-11px measured on PixelLab output), so import
+                                   # tooling MUST compute an alpha-derived pivot or grounded sprites float.
   custom_pivot_normalized: null    # [0.5, 0.0] if pivot=custom for 2D
   pixels_per_unit: 100             # required for sprite; null for pure 3D model.
                                    # MUST equal art-spec craft.pixels_per_unit (the project PPU SSOT);
@@ -71,6 +75,10 @@ runtime:
   #   target_lufs: -16.0              # loudness target; normalize before approval
 
 animation: null                    # animated assets only — replace null with the block below (unity-animation)
+animation_waiver: null             # ACTING roles (player_character/enemy_unit/boss/tower/interactable) MUST
+                                   # ship animation OR name the code-driven feedback that replaces it here
+                                   # (e.g. "death = flash+squash+fade in Goblin.cs"); the validator fails
+                                   # acting roles with animation: null and no waiver.
 # animation:
 #   sheet: Assets/<Game>/Art/Approved/<id>/Anim/<id>_sheet.png       # sprite-sheet source (2D frame animation; null for 3D skeletal)
 #   sheet_slicing: Assets/<Game>/Art/Approved/<id>/Anim/<id>_sheet.slicing.json

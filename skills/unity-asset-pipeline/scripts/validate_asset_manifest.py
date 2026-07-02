@@ -473,12 +473,50 @@ def validate_contract(contract_path: Path, args: argparse.Namespace) -> dict:
             add(checks, "scale.computed", False, "scale_valid cannot be computed: needs readable PNG source art, runtime.pixels_per_unit, and runtime.scale_meters.", {"dims": list(dims) if dims else None, "ppu": ppu_contract, "scale_meters": scale_m})
         if spec is not None and get_path(spec, "craft.finish") == "pixel":
             tile = get_path(spec, "craft.tile_size")
-            if isinstance(tile, int) and tile > 0 and dims:
+            # Backgrounds are framed to the internal render target, not the tile
+            # grid (a 320x180 panel at tile_size 32 is correct art) — the
+            # tile-multiple rule applies to grid-placed assets only.
+            bg_roles = {"far_bg", "background"}
+            base_rr = get_path(spec, "craft.base_render_resolution")
+            is_bg = c.get("role") in bg_roles or (isinstance(base_rr, list) and dims and list(dims) == list(base_rr))
+            if isinstance(tile, int) and tile > 0 and dims and not is_bg:
                 add(checks, "scale.tile_multiple", dims[0] % tile == 0 and dims[1] % tile == 0, "Pixel sprite canvas is a whole multiple of art-spec craft.tile_size.", {"dims": list(dims), "tile_size": tile})
+            elif is_bg and dims:
+                add(checks, "scale.tile_multiple", True, "tile_multiple N/A: background panel framed to the render target, not the tile grid.", {"dims": list(dims), "role": c.get("role")})
 
     # ---- GameTheme.cs derived-view palette equality (colors only) ----
     if spec is not None:
         check_game_theme_hexes(checks, spec, contract_path, args.game_theme)
+
+    # ---- role animation-catalog gate (unity-animation per-role requirements) ----
+    # An asset that ACTS in the game must ship animation. "They just disappear" /
+    # static towers are the exact field failures this catches: an acting role with
+    # animation: null passes every other gate silently. Waive ONLY with an explicit
+    # animation_waiver string in the contract (e.g. "death feedback is code-driven
+    # flash+squash in Goblin.cs") — the waiver text is the accountability record.
+    ACTING_ROLES = {
+        "player_character": ("run/idle", "at minimum a movement clip"),
+        "enemy_unit": ("move + death/hit", "movement and a death/hit clip (or a code-feedback waiver)"),
+        "boss": ("move + attack + death", "movement, attack, and death clips"),
+        "tower": ("idle + fire", "idle and fire clips"),
+        "interactable": ("state change", "a state-change clip (or a code-feedback waiver)"),
+    }
+    role = c.get("role")
+    anim_block = get_path(c, "animation")
+    waiver = c.get("animation_waiver")
+    if role in ACTING_ROLES and get_path(c, "runtime.type") in ("sprite", "model"):
+        need, human = ACTING_ROLES[role]
+        if anim_block:
+            add(checks, "animation.role_catalog", True,
+                f"Acting role '{role}' ships an animation block ({need}).", {"role": role})
+        elif isinstance(waiver, str) and waiver.strip():
+            add(checks, "animation.role_catalog", True,
+                f"Acting role '{role}' has no animation block — WAIVED: {waiver.strip()[:120]}",
+                {"role": role, "waiver": waiver.strip()})
+        else:
+            add(checks, "animation.role_catalog", False,
+                f"Acting role '{role}' requires {human} (unity-animation per-role catalog) but the contract has animation: null and no animation_waiver. Assets that act must move — or the waiver must name the code-driven feedback that replaces it.",
+                {"role": role})
 
     # ---- animation identity gate: frame-vs-anchor diff reports ----
     animation = get_path(c, "animation")
@@ -623,6 +661,31 @@ def validate_registry(registry_path: Path, args: argparse.Namespace) -> dict:
                 else:
                     if get_path(cdata, "runtime.type") == "sprite":
                         sprite_ppus[str(entry.get("id") or prefix)] = get_path(cdata, "runtime.pixels_per_unit")
+                    # DEEP per-contract validation (default-on). Registry mode used
+                    # to run only registry-level checks, so the deep gates (role
+                    # animation catalog, frame-diff reports, palette/scale, GameTheme
+                    # equality) silently never ran at gate time — an acting asset
+                    # with animation: null sailed through. Roll every contract's
+                    # full validation up into the registry result.
+                    if not args.shallow:
+                        # Per-contract checks resolve the composition profile from
+                        # --composition; in registry mode inherit the registry's
+                        # composition_profile: key so deep validation sees it.
+                        prev_comp = args.composition
+                        if not prev_comp:
+                            reg_comp = registry.get("composition_profile") if isinstance(registry, dict) else None
+                            if reg_comp:
+                                rc = resolve_project_path(str(reg_comp), registry_path)
+                                args.composition = str(rc) if rc.exists() else prev_comp
+                        sub = validate_contract(cp, args)
+                        args.composition = prev_comp
+                        sub_fails = [x for x in sub["checks"] if x["status"] == "fail"]
+                        add(checks, f"{prefix}.contract.deep", not sub_fails,
+                            f"Full contract validation {'passes' if not sub_fails else 'FAILS'} ({len(sub_fails)} failing checks)."
+                            + ("" if not sub_fails else " Failing: " + "; ".join(x["id"] for x in sub_fails[:6])),
+                            {"contract": str(cp), "failures": [
+                                {"id": x["id"], "message": x["message"]} for x in sub_fails[:10]
+                            ]})
 
     # ---- one game = one PPU (uniformity across sprite contracts + vs spec) ----
     if sprite_ppus:
@@ -653,6 +716,7 @@ def build_parser():
     p.add_argument("--composition", help="Path to composition.yaml (default: sibling of the resolved art-spec / registry composition_profile:)")
     p.add_argument("--no-art-spec", action="store_true", help="EXPLORATORY ONLY: skip art-spec coherence + computed palette/scale/PPU checks")
     p.add_argument("--no-composition", action="store_true", help="Skip composition coherence when no composition profile exists yet")
+    p.add_argument("--shallow", action="store_true", help="Registry mode: skip the deep per-contract validation roll-up (fast structural pass only — NOT a gate)")
     p.add_argument("--scale-tolerance", type=float, default=0.35, help="Allowed relative deviation of sprite world height vs runtime.scale_meters[1] (default: 0.35)")
     p.add_argument("--sprite-qa", help="Path to validate_sprite.py JSON report; must pass")
     p.add_argument("--image-critique", help="Path to critique_image.py JSON report; verdict must pass")

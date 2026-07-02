@@ -40,7 +40,7 @@ Read only the branch you need:
 5. **Derive frames/rotations/variants from the anchor.** Keep one base sprite driving directions, walk/idle/attack strips, damage states, and palette variants:
    - **Directions →** `rotate` (set `--from-direction`/`--to-direction`).
    - **Animation →** the **skeleton workflow** (`estimate-skeleton` → author per-frame poses → `animate-skeleton`). This is structurally consistent across frames. `animate-text` is the drift-prone fallback; never author each frame independently.
-   - **Recolors / damage states / edits →** BitForge conditioned on the anchor (`--style-image` with `--style-strength 60–100`), or `inpaint` for local fixes.
+   - **Recolors / damage states / edits →** BitForge conditioned on the anchor (`--init-image` with `--init-image-strength 250–400`), or `inpaint` for local fixes.
    - **Derived frames/rotations use the anchor's extracted sub-palette** (a subset of the master — never the full game palette, which permits cross-asset color borrowing; never new colors). Emit the swatch from the approved anchor (`compare_frames_to_anchor.py --anchor <anchor.png> --emit-subpalette <id>_subpalette.png`) and pass it via `--color-image`; omitting `--color-image` falls back to the full master palette, which this rule forbids for derived frames.
 6. **Gate frames with `scripts/compare_frames_to_anchor.py`** (palette-membership + baseline/bbox + loose silhouette-IoU vs the anchor) before slicing. Manual eyeballing does not replace it.
 7. **Repack sheets with padding/extrusion.** Use `extrude_atlas.py` before Unity slicing so point filtering and atlas packing do not bleed neighboring cells.
@@ -120,6 +120,8 @@ python3 ~/.claude/skills/unity-pixel-art/scripts/generate_pixel_art.py animate-s
   --output "Assets/<Game>/Art/Source/SourceImages/knight_walk.png"   # -> _00.png… + _strip.png
 ```
 
+**Author action poses with BIG deltas:** normalized keypoint offsets of ±0.05 read as nothing at 32-64px — attack/swing poses need ±0.15-0.25 on the striking limb plus torso lean, and the strike frame should extend the weapon past the silhouette. Verify with the `--action` motion gate before wiring. Also note: PixelLab canvases carry transparent padding rows below the feet (3-11px measured) — the FEET, not the canvas bottom, are the baseline; import pivots must be alpha-derived (see unity-asset-pipeline).
+
 Canvas defaults to the reference image; identity/pose adherence is governed by the live API's single `guidance_scale` (server default 4.0), tunable via `--guidance-scale`. **Live-endpoint constraints (all auto-handled by the script, 2026-07-01):** the whole command runs over **raw HTTP** — SDK 1.0.5 is incompatible (it nulls absent `inpainting_images`/`mask_images`, which the API rejects, and can't send `guidance_scale`); the canvas must be **square 16/32/64/128/256** (non-square characters are padded baseline-preserving and frames cropped back); each call takes an **exact pose count set by the canvas** (e.g. 3 at 64×64 — longer clips are batched automatically); `z_index` must be an integer (estimate-skeleton emits fractional ones; the script rounds). Use `rotate` to spin the base/keyframes into other directions. **Fix single bad frames instead of re-rolling the strip:** `inpaint` (white mask) on that frame, or re-run `animate-skeleton` with `--init-images` freezing the approved frames. `animate-text` exists as a fallback when no skeleton can be authored, but it drifts more. Gate every strip with `compare_frames_to_anchor.py` before slicing.
 
 Before a paid batch, check credits and use `--dry-run` to verify dimensions, prompt, and conditioning inputs:
@@ -145,7 +147,7 @@ python3 ~/.claude/skills/unity-image-generator/scripts/validate_sprite.py \
 
 (Tile-aligned characters whose baseline sits on the bottom canvas edge use `--min-padding 0` — per-sprite edge padding is an atlas concern and is added by `extrude_atlas.py` at repack, not at generation. With an art-spec, exact palette membership is checked against the **master-palette.png swatch pixels** — the same artifact generation conditioned on — not the spec hex lists.)
 
-**MANDATORY for every animation strip / rotation set** — deterministic frame-vs-anchor identity diff (palette membership, baseline/bbox drift, loose silhouette-IoU identity-swap floor). Exit 1 = do not slice; repair the failing frame (`inpaint` / `--init-images` freeze) instead of re-rolling the strip:
+**MANDATORY for every animation strip / rotation set** — deterministic frame-vs-anchor identity diff (palette membership, baseline/bbox drift, loose silhouette-IoU identity-swap floor). **Add `--action` for attack/hit/death clips** — it additionally requires visible inter-frame MOTION (≥0.35 pixel-change between at least one frame pair; calibrated live: a slash that read as broken in-game measured 0.27, a real run cycle 0.78). Identity gates alone pass near-identical standing poses that play "correctly" in the Animator yet read as nothing. Exit 1 = do not slice; repair the failing frame (`inpaint` / `--init-images` freeze) instead of re-rolling the strip:
 
 ```bash
 python3 ~/.claude/skills/unity-pixel-art/scripts/compare_frames_to_anchor.py \

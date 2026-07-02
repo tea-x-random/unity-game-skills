@@ -111,3 +111,23 @@ Score each; fix any that fail before "done":
 - Author the few high-impact clips (idle/move/attack/hit/death) first; reuse and retarget shared motion rather than generating per-character.
 - Procedural juice (squash-stretch, shake, hit-stop) is a force-multiplier ON TOP of authored animation, not a substitute for it.
 - Seamless loops matter: a popping idle/walk loop cheapens an otherwise good asset — match first/last frames.
+
+## Verification: playing ≠ visible (both are gates)
+
+Field bug class: the Animator graph is mechanically perfect (trigger fires, state enters, exits
+on time) yet the player reports "the animation doesn't work" — because the clip's frames are
+near-identical. Two REQUIRED checks for every gameplay-triggered clip:
+
+1. **State-entry PlayMode assertion** (machine correctness): after simulating the input, assert
+   the Animator actually enters the state and returns —
+   `animator.GetCurrentAnimatorStateInfo(0).shortNameHash == Animator.StringToHash("slash")`
+   within N frames, then back to the default state. One test per input-reachable state.
+2. **Visible-motion gate** (content correctness): action strips (attack/hit/death) must pass
+   `compare_frames_to_anchor.py --action` (≥0.35 inter-frame pixel change; a real run cycle
+   measures ~0.78, a too-subtle slash that shipped broken measured 0.27). Selling a fast action
+   also usually needs code-side motion (a 0.2s lunge/recoil on the visual child) — animation
+   frames alone at 3 frames/0.2s under-read.
+
+Death/kill feedback is part of the animation bar: enemies never "pop out of existence" — if no
+death strip exists yet, code-driven feedback (flash + squash + fade + particles) is the minimum
+and must be named in the asset contract's `animation_waiver`.

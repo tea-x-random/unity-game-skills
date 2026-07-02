@@ -102,3 +102,17 @@ RenderTexture.active = rt;  // then ReadPixels -> EncodeToPNG
 - Always assert the PNG is **non-black** (sample pixels) — "file exists" is not evidence.
 - Related trap when compositing sprites headless: see the URP 2D batcher texture-binding rule in
   `unity-asset-pipeline/references/editor-asset-pipeline.md` (one Sprite-Unlit material per asset).
+
+## Pre-flight: the project lock
+
+An open Editor (user launched via Hub) holds the project lock; batch runs then die at startup
+with exit 1 and only a misleading "Package Manager server was shutdown" in the log — no explicit
+lock error. ALWAYS pre-flight: `pgrep -fl Unity | grep <project-name>` and coordinate with the
+user before killing anything (their unsaved scene edits die with the process).
+
+## Capturing UI headless
+
+Screen-Space-Overlay canvases never appear in camera RT captures (no game view in batch). To
+produce UI-inclusive evidence: temporarily switch the canvas to Screen-Space-Camera (assign the
+game camera, plane distance ~1), render via RenderPipeline.SubmitRenderRequest(StandardRequest),
+then restore Overlay mode. State in the report which capture path was used.

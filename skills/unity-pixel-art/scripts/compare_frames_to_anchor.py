@@ -118,6 +118,10 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("--iou-floor", type=float, default=0.30,
                    help="LOOSE silhouette-IoU floor — identity-swap detector, not a pose matcher (default 0.30)")
     p.add_argument("--no-baseline", action="store_true", help="Skip the baseline check (e.g. jump/death frames)")
+    p.add_argument("--action", action="store_true",
+                   help="This is an ACTION clip (attack/hit/death): additionally require visible inter-frame motion — near-identical frames pass identity gates but read as a broken animation in game")
+    p.add_argument("--min-inter-frame-motion", type=float, default=0.35,
+                   help="--action: minimum fraction of relevant pixels that must change between at least one consecutive frame pair (default 0.35 — calibrated live: a too-subtle slash that read as broken measured 0.27, a real run cycle 0.78; a 1px whole-body shift alone is ~0.30)")
     p.add_argument("--emit-subpalette", metavar="PATH",
                    help="Write the anchor's unique opaque colors as a color_image-compatible swatch PNG "
                         "(the derived-frame sub-palette for generate_pixel_art.py --color-image), then "
@@ -211,11 +215,40 @@ def main(argv: list[str] | None = None) -> int:
         })
         results.append(entry)
 
+    # ---- inter-frame MOTION check (--action) ----
+    # Identity gates pass strips whose frames are near-identical standing poses —
+    # "the slash animation doesn't work" even though the animator plays it (field
+    # bug, Knight Runner 2026-07-01). Action clips (attack/hit/death) must MOVE:
+    # require a minimum fraction of pixels to change between consecutive frames.
+    motion_report = None
+    if args.action and len(frames) >= 2:
+        import itertools
+        frame_pixels = [img for _name, img in frames]
+        deltas = []
+        for a, b in itertools.pairwise(frame_pixels):
+            if a is None or b is None or a.size != b.size:
+                continue
+            pa, pb = list(a.getdata()), list(b.getdata())
+            relevant = [i for i in range(len(pa)) if pa[i][3] > args.alpha_threshold or pb[i][3] > args.alpha_threshold]
+            changed = sum(1 for i in relevant if pa[i] != pb[i])
+            deltas.append(changed / max(1, len(relevant)))
+        max_delta = max(deltas) if deltas else 0.0
+        motion_pass = max_delta >= args.min_inter_frame_motion
+        motion_report = {
+            "pass": motion_pass,
+            "max_inter_frame_change": round(max_delta, 3),
+            "per_pair": [round(d, 3) for d in deltas],
+            "floor": args.min_inter_frame_motion,
+            "note": "action clips must visibly move; near-identical frames read as a broken animation in game",
+        }
+        all_pass = all_pass and motion_pass
+
     report = {
         "tool": "unity-pixel-art/scripts/compare_frames_to_anchor.py",
         "anchor": args.anchor,
         "palette_source": palette_source,
         "allowed_colors": len(allowed),
+        "motion": motion_report,
         "thresholds": {
             "alpha_threshold": args.alpha_threshold,
             "max_nonmember_pct": args.max_nonmember_pct,

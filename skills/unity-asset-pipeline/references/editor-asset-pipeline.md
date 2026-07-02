@@ -420,3 +420,15 @@ Observed on 6000.5 + URP 17.5, batch-mode renders (edit-mode `StandardRequest` c
 - A plain scene GameObject whose SpriteRenderer references a project-local `.mat` or approved `.png` **directly** puts that guid in the `.unity` file — a `.mat` under `Assets/<Game>/Materials/` FAILS the gate.
 - **Reference art only through registry prefab INSTANCES.** A prefab instance serializes just `m_SourcePrefab` (the registry prefab guid — allowed); the sprite/material references stay inside the prefab file, which the gate does not scan.
 - **Instance overrides with plain values are safe**: e.g. a tiled ground band = the `StoneTile` registry prefab instantiated with `drawMode = Tiled`, `size = (22, 3)` overrides — no guid enters the scene. Never rebuild the same visual as a raw scene SpriteRenderer to "save a prefab".
+
+## Alpha-derived pivots (grounded sprites)
+
+`pivot: bottom_center` must anchor the **visual feet, not the canvas bottom**. Generated
+canvases (PixelLab measured 3-11px) carry fully transparent rows below the drawn feet; a
+canvas-bottom pivot renders the character floating that many pixels above the ground line —
+invisible to every import/registry gate and obvious to the first player. Import tooling
+computes the bottom-most opaque row from the PNG bytes (`File.ReadAllBytes` + `LoadImage`
+works regardless of `readable: false`) and sets `spriteAlignment = Custom` with
+`spritePivot.y = bottomOpaqueRow / height`, **per frame for animation strips** (each frame's
+padding differs). Pair it with a PlayMode assertion: when grounded, |sprite bounds min.y −
+ground top| ≤ 1 texel.
