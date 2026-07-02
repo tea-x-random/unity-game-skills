@@ -134,3 +134,11 @@ then re-import with zero code edits. Reusable runtime patterns proven here: sing
 instance keyed to an action cooldown (cooldown > VFX lifetime = no pool bookkeeping), and
 hitstop via the game loop's OWN clock (drain dt, never Time.timeScale) — deterministic,
 test-friendly, and right for turn/card games too.
+
+## 6000.5 API drift log (verified in real builds)
+
+- `Object.FindFirstObjectByType<T>()` is CS0618-deprecated in 6000.5 — use `FindAnyObjectByType<T>()`.
+- When pre-flighting the project lock, filter `pgrep` output by the PROJECT PATH — a live Editor on a
+  DIFFERENT project is not a lock on yours.
+- Runtime-built UI (controller constructs the HUD in Awake) shrinks the headless-wiring surface to a
+  handful of scene refs — the strongest defense against the NewScene ref-invalidation class.
