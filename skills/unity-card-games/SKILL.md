@@ -68,10 +68,21 @@ Card combat has forks that silently change every test. Lock them in the spec fir
   fan with zero layout-timing dependence. This is what makes 4:3 ↔ 19.5:9 hold unchanged.
 - **Crop-to-cover**: `RectMask2D` parent + child `AspectRatioFitter(EnvelopeParent, w/h)` for
   window art and board backgrounds; `FitInParent` for whole card faces in arbitrary slots.
-- **Drag-drop trio**: (a) `raycastTarget=false` on the dragged card's bg in OnBeginDrag so the
-  drop RaycastAll doesn't hit itself; (b) reparent to canvas root + SetAsLastSibling; (c) let
-  the post-play hand re-render destroy the dragged view inside its own OnEndDrag (safe:
-  Destroy is deferred). Resolve targets via `GetComponentInParent<SlotView>` on raycast hits.
+- **Drag-drop rules (REVISED after a shipped ghost-card bug):** (a) `raycastTarget=false` on
+  the dragged card's bg in OnBeginDrag so the drop RaycastAll doesn't hit itself; (b) if the
+  dragged view must render above siblings, move it to a dedicated **DragLayer** container —
+  NEVER loose to canvas root; (c) **every hand/board re-render unconditionally clears the
+  DragLayer** (and every other container that can own transient views). Deferred-Destroy /
+  event-ordering assumptions are BANNED — "OnEndDrag will clean it up" shipped ghost cards the
+  first time OnDrop's re-render ran before it. Resolve targets via
+  `GetComponentInParent<SlotView>` on raycast hits.
+- **Orphan-count PlayMode assertion (REQUIRED):** after drag-play, failed drop, and END TURN
+  mid-hand, total live CardViews == hand + board + enemy backs. This catches the entire
+  transient-view-leak class regardless of which ordering produced it.
+- **Test every input path's VIEW lifecycle separately.** One-rules-path (drag and click funnel
+  into the same handlers) covers the RULES — but drag and click have different view lifecycles
+  (reparenting, raycast toggles, end-events), and a click-only test suite shipped a drag-only
+  ghost bug. Simulate the real drag events (ExecuteEvents + synthesized PointerEventData).
 - **One rules path**: drag AND click-fallback funnel into the same DropOnLane/DropOnHero —
   PlayMode tests then drive the real handlers without synthesizing pointer events. No-target
   spells need an explicit gesture (drop-on-own-hero or second click).

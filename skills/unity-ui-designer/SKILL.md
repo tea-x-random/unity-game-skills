@@ -226,3 +226,8 @@ Report: detected UI stack and why; screens built and that they went through `man
   the capture (then restore), or the evidence is UI-blind and overlay bugs ship.
 - Safe area: HUD content lives under a SafeAreaFitter container (anchors from Screen.safeArea),
   not raw canvas corners.
+- **Transient-view lifecycle (drag ghosts, stale FX):** any rebuild/re-render sweep must clear
+  EVERY container that can own transient views (drag layers, FX layers, tooltip layers) — not
+  just the primary list container. Views moved out of their owner (reparented for z-order) are
+  exactly the ones a naive children-sweep misses. Ban ordering assumptions ("the end-drag
+  handler will destroy it"); enforce with a count assertion: live views == model count.
